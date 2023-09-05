@@ -31,10 +31,32 @@ function test_U_complex2real()
     return MagFieldLFT.U_complex2real(2) ≈ ref
 end
 
+function test_calc_lops()
+    l=2
+    ref_lz = [2 0 0 0 0;
+              0 1 0 0 0;
+              0 0 0 0 0;
+              0 0 0 -1 0;
+              0 0 0 0 -2]
+    ref_lplus = [0 2 0 0 0;
+                 0 0 sqrt(6) 0 0;
+                 0 0 0 sqrt(6) 0;
+                 0 0 0 0 2;
+                 0 0 0 0 0]
+    ref_lminus = [0 0 0 0 0;
+                  2 0 0 0 0;
+                  0 sqrt(6) 0 0 0;
+                  0 0 sqrt(6) 0 0;
+                  0 0 0 2 0]
+    lz, lplus, lminus = MagFieldLFT.calc_lops(l)
+    return lz ≈ ref_lz && lplus ≈ ref_lplus && lminus ≈ ref_lminus
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_iscanonical1()
     @test test_iscanonical2()
     @test test_iscanonical3()
     @test test_createSDs()
     @test test_U_complex2real()
+    @test test_calc_lops()
 end

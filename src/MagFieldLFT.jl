@@ -92,5 +92,44 @@ c_matrices = Dict((2,0) => c2_0,
                   (3,4) => c3_4,
                   (3,6) => c3_6)
 
+"""
+Calculate lz operator in basis of complex spherically symmetric orbitals.
+"""
+calc_lz(l::Int) = diagm(l:-1:-l)
+
+function calc_lplusminus(l::Int, sign::Int)
+    @assert Int64(abs(sign)) == 1       # sign may only be +1 or -1
+    dim = 2l+1
+    mvalues = l:-1:-l
+    op = zeros(dim,dim)
+    for i_prime in 1:dim
+        m_prime = mvalues[i_prime]
+        for i in 1:dim
+            m = mvalues[i]
+            if m_prime == (m + sign)
+                op[i_prime, i] = sqrt(l*(l+1) - m*(m+sign))
+            end
+        end
+    end
+    return op
+end
+
+function calc_lops(l::Int)
+    return calc_lz(l), calc_lplusminus(l,+1), calc_lplusminus(l,-1)
+end
+
+"""
+Outline of implementation:
+
+function calc_H_nonrel(hLFT, F_k)
+    ERIs = calc_ERIs(F_k)
+    h_mod = calc_hmod(hLFT, ERIs)
+    H_single = calc_singletop(h_mod)   # same function can also be used for angular momentum matrices
+    H_double = calc_double_exc(ERIs)
+    return H_single + H_double
+end
+
+"""
+
 
 end
