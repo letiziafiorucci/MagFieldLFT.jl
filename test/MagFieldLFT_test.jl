@@ -66,6 +66,17 @@ function test_calcERIs_real()
     return ERIs[2,2,5,5] ≈ (-195.92/63) && ERIs[1,4,2,5] ≈ (-0.64/21)
 end
 
+function test_spinorb2orbindex()
+    return MagFieldLFT.spinorb2orbindex(2) == (1, 'β') && MagFieldLFT.spinorb2orbindex(5) == (3, 'α')
+end
+
+function test_occ_list()
+    SD = [1,3,4,7]
+    alpha_list = MagFieldLFT.occ_list(SD, 'α')
+    beta_list = MagFieldLFT.occ_list(SD, 'β')
+    return alpha_list == [(1, 1),(2, 2),(4, 4)] && beta_list == [(3,2)]
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_iscanonical1()
     @test test_iscanonical2()
@@ -75,4 +86,6 @@ end
     @test test_calc_lops()
     @test test_calcERIs_complex()
     @test test_calcERIs_real()
+    @test test_spinorb2orbindex()
+    @test test_occ_list()
 end

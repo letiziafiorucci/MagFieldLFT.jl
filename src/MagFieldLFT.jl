@@ -155,6 +155,34 @@ function calcERIs_real(l::Int, F::Dict{Int64, Float64})
     return real(ERIs_real)
 end
 
+function spinorb2orbindex(P::Int)
+    p = (P+1) ÷ 2
+    if (P+1)%2 == 0
+        sigma = 'α'
+    else
+        sigma = 'β'
+    end
+    return p,sigma
+end
+
+"""
+For a given Slater determinant (Vector of spin orbital indices in canonical order),
+this function returns a list of either the alpha or the beta orbitals, depending on the
+chosen channel.
+For each spin orbital that belongs to the requested channel, a tuple of the position
+in the Slater determinant (electron index) and the corresponding orbital index is returned.
+"""
+function occ_list(SD::Vector{Int64}, channel::Char)
+    list = Array{Tuple{Int64,Int64}}(undef,0)
+    for i in 1:length(SD)
+        p,sigma = spinorb2orbindex(SD[i])
+        if sigma == channel
+            push!(list, (i,p))
+        end
+    end
+    return list
+end
+
 """
 Outline of implementation:
 
