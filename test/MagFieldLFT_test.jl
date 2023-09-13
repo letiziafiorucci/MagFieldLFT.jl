@@ -72,9 +72,23 @@ end
 
 function test_occ_list()
     SD = [1,3,4,7]
-    alpha_list = MagFieldLFT.occ_list(SD, 'α')
-    beta_list = MagFieldLFT.occ_list(SD, 'β')
-    return alpha_list == [(1, 1),(2, 2),(4, 4)] && beta_list == [(3,2)]
+    occ_alpha_list = MagFieldLFT.occ_list(SD, 'α')
+    occ_beta_list = MagFieldLFT.occ_list(SD, 'β')
+    return occ_alpha_list == [(1, 1),(2, 2),(4, 4)] && occ_beta_list == [(3,2)]
+end
+
+function test_orb2spinorb_and_back()
+    test1 = MagFieldLFT.spinorb2orbindex(MagFieldLFT.orb2spinorbindex(3,'α')) == (3,'α')
+    test2 = MagFieldLFT.orb2spinorbindex(MagFieldLFT.spinorb2orbindex(17)...) == 17
+    return test1 && test2
+end
+
+function test_unocc_list()
+    SD = [1,2,4,5,6,11]
+    norb = 7
+    unocc_alpha_list = MagFieldLFT.unocc_list(SD, norb, 'α')
+    unocc_beta_list = MagFieldLFT.unocc_list(SD, norb, 'β')
+    return unocc_alpha_list == [2,4,5,7] && unocc_beta_list == [4,5,6,7]
 end
 
 @testset "MagFieldLFT.jl" begin
@@ -88,4 +102,6 @@ end
     @test test_calcERIs_real()
     @test test_spinorb2orbindex()
     @test test_occ_list()
+    @test test_orb2spinorb_and_back()
+    @test test_unocc_list()
 end

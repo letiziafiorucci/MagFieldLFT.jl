@@ -165,6 +165,15 @@ function spinorb2orbindex(P::Int)
     return p,sigma
 end
 
+function orb2spinorbindex(p::Int, sigma::Char)
+    @assert sigma == 'α' || sigma == 'β'
+    if sigma == 'α'
+        return 2p-1
+    else
+        return 2p
+    end
+end
+
 """
 For a given Slater determinant (Vector of spin orbital indices in canonical order),
 this function returns a list of either the alpha or the beta orbitals, depending on the
@@ -173,11 +182,24 @@ For each spin orbital that belongs to the requested channel, a tuple of the posi
 in the Slater determinant (electron index) and the corresponding orbital index is returned.
 """
 function occ_list(SD::Vector{Int64}, channel::Char)
+    @assert channel == 'α' || channel == 'β'
     list = Array{Tuple{Int64,Int64}}(undef,0)
     for i in 1:length(SD)
         p,sigma = spinorb2orbindex(SD[i])
         if sigma == channel
             push!(list, (i,p))
+        end
+    end
+    return list
+end
+
+function unocc_list(SD::Vector{Int64}, norb::Int, channel::Char)
+    @assert channel == 'α' || channel == 'β'
+    list = Array{Int64}(undef,0)
+    for p in 1:norb
+        P = orb2spinorbindex(p,channel)
+        if !(P in SD)
+            push!(list, p)
         end
     end
     return list
