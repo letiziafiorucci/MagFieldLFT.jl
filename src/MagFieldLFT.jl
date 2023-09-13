@@ -119,6 +119,43 @@ function calc_lops(l::Int)
 end
 
 """
+We do not make use of the symmetries of ERIs since their
+number is anyway small in single-shell LFT with d or f orbitals.
+This simplifies the implementation.
+This function calculates ERIs of complex orbitals
+"""
+function calcERIs_complex(l::Int, F::Dict{Int64, Float64})
+    dim = 2l+1
+    m = l:-1:-l
+    ERIs = zeros(dim, dim, dim, dim)
+    for p in 1:dim, q in 1:dim, r in 1:dim, s in 1:dim
+        if m[p]-m[q] == m[s]-m[r]
+            for k in 0:2:2l
+                ERIs[p,q,r,s] += c_matrices[(l,k)][p,q] * c_matrices[(l,k)][s,r] * F[k]
+            end
+        end
+    end
+    return ERIs
+end
+
+function calcERIs_real(l::Int, F::Dict{Int64, Float64})
+    dim = 2l+1
+    U = U_complex2real(l)
+    # The following loop structure has O(8) complexity instead of O(5)
+    # for the ERI transformation. But we can afford it for such a
+    # small number of orbitals (5 or 7), and it makes the code simpler.
+    ERIs_complex = calcERIs_complex(l, F)
+    ERIs_real = im*zeros(dim, dim, dim, dim)
+    for p in 1:dim, q in 1:dim, r in 1:dim, s in 1:dim
+        for t in 1:dim, u in 1:dim, v in 1:dim, w in 1:dim
+            ERIs_real[t,u,v,w] += ERIs_complex[p,q,r,s] * U[p,t] * U[q,u] * U[r,v] * U[s,w]
+        end
+    end
+    @assert norm(imag(ERIs_real)) < 1e-12
+    return real(ERIs_real)
+end
+
+"""
 Outline of implementation:
 
 function calc_H_nonrel(hLFT, F_k)
