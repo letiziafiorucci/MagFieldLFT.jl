@@ -148,7 +148,7 @@ function calcERIs_real(l::Int, F::Dict{Int64, Float64})
     ERIs_real = im*zeros(dim, dim, dim, dim)
     for p in 1:dim, q in 1:dim, r in 1:dim, s in 1:dim
         for t in 1:dim, u in 1:dim, v in 1:dim, w in 1:dim
-            ERIs_real[t,u,v,w] += ERIs_complex[p,q,r,s] * U[p,t] * U[q,u] * U[r,v] * U[s,w]
+            ERIs_real[t,u,v,w] += ERIs_complex[p,q,r,s] * U[p,t]' * U[q,u] * U[r,v]' * U[s,w]
         end
     end
     @assert norm(imag(ERIs_real)) < 1e-12

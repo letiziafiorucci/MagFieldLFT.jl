@@ -63,7 +63,22 @@ function test_calcERIs_real()
     F = Dict(0=>3.2, 2=>1.72, 4=>2.20)
     l = 2
     ERIs = MagFieldLFT.calcERIs_real(l, F)
-    return ERIs[2,2,5,5] ≈ (-195.92/63) && ERIs[1,4,2,5] ≈ (-0.64/21)
+    return ERIs[2,2,5,5] ≈ (195.92/63) && ERIs[1,4,2,5] ≈ (-0.64/21)
+end
+
+function test_ERIs_symmetries()
+    F = Dict(0=>3.2, 2=>1.72, 4=>2.20)
+    l = 2
+    ERIs = MagFieldLFT.calcERIs_real(l, F)
+    @assert abs(ERIs[1,2,4,5]) > 1e-4
+    t1 = ERIs[1,2,4,5] ≈ ERIs[2,1,4,5]
+    t2 = ERIs[1,2,4,5] ≈ ERIs[1,2,5,4]
+    t3 = ERIs[1,2,4,5] ≈ ERIs[2,1,5,4]
+    t4 = ERIs[1,2,4,5] ≈ ERIs[4,5,1,2]
+    t5 = ERIs[1,2,4,5] ≈ ERIs[5,4,1,2]
+    t6 = ERIs[1,2,4,5] ≈ ERIs[4,5,2,1]
+    t7 = ERIs[1,2,4,5] ≈ ERIs[5,4,2,1]
+    return t1 && t2 && t3 && t4 && t5 && t6 && t7
 end
 
 function test_spinorb2orbindex()
@@ -124,4 +139,5 @@ end
     @test test_unocc_list()
     @test test_SD2index()
     @test test_Z_summand()
+    @test test_ERIs_symmetries()
 end
