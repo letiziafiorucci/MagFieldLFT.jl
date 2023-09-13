@@ -91,6 +91,24 @@ function test_unocc_list()
     return unocc_alpha_list == [2,4,5,7] && unocc_beta_list == [4,5,6,7]
 end
 
+function test_SD2index()
+    N = 3
+    norb = 7
+    M = 2norb
+    SDs = MagFieldLFT.create_SDs(N,norb)
+    test1 = MagFieldLFT.SD2index(SDs[51], M) == 51
+    test2 = MagFieldLFT.SD2index(SDs[32], M) == 32
+    return test1 && test2
+end
+
+function test_Z_summand()
+    M = 14
+    N = 3
+    i = 2
+    P = 3
+    return MagFieldLFT.Z_summand(i,P,N,M) == 11
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_iscanonical1()
     @test test_iscanonical2()
@@ -104,4 +122,6 @@ end
     @test test_occ_list()
     @test test_orb2spinorb_and_back()
     @test test_unocc_list()
+    @test test_SD2index()
+    @test test_Z_summand()
 end

@@ -193,6 +193,11 @@ function occ_list(SD::Vector{Int64}, channel::Char)
     return list
 end
 
+"""
+SD: List of spin orbital indices in canonical order
+norb: number of spatial orbitals
+channel: 'α' or 'β'
+"""
 function unocc_list(SD::Vector{Int64}, norb::Int, channel::Char)
     @assert channel == 'α' || channel == 'β'
     list = Array{Int64}(undef,0)
@@ -203,6 +208,32 @@ function unocc_list(SD::Vector{Int64}, norb::Int, channel::Char)
         end
     end
     return list
+end
+
+function Z_summand(i::Int64, P::Int64, N::Int64, M::Int64)
+    @assert i<=N
+    if i==N
+        return P-N
+    else
+        value = 0
+        for m in (M-P+1):(M-i)
+            value += binomial(m, N-i) - binomial(m-1, N-i-1)
+        end
+        return value
+    end
+end
+
+"""
+SD: List of spin orbital indices
+M:  Total number of spin orbitals
+"""
+function SD2index(SD::Vector{Int64}, M::Int64)
+    N = length(SD)
+    I = 1
+    for i in 1:N
+        I += Z_summand(i, SD[i], N, M)
+    end
+    return I
 end
 
 """
