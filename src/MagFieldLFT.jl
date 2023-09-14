@@ -1,6 +1,6 @@
 module MagFieldLFT
 
-using LinearAlgebra
+using LinearAlgebra, Permutations
 
 function iscanonical(orblist::Vector{T}) where T <: Int
     for i in 2:length(orblist)
@@ -234,6 +234,27 @@ function SD2index(SD::Vector{Int64}, M::Int64)
         I += Z_summand(i, SD[i], N, M)
     end
     return I
+end
+
+function calc_exc_equal(SD::Vector{Int64}, norb::Int, channel::Char)
+    @assert channel == 'α' || channel == 'β'
+    occ = occ_list(SD, channel)
+    unocc = unocc_list(SD, norb, channel)
+    alphaexc = Array{Tuple{Int64, Int64, Int64, Int64}}(undef,0)
+    for (i,q) in occ
+        for p in unocc
+            P = orb2spinorbindex(p, channel)   # spin orbital index we are exciting to
+            SD_exc = deepcopy(SD)
+            SD_exc[i] = P
+            perm = sortperm(SD_exc)
+            SD_exc_canonical = SD_exc[perm]
+            perm = Permutation(perm)
+            gamma = sign(perm)
+            I = SD2index(SD_exc_canonical, 2norb)
+            push!(alphaexc, (I, p, q, gamma))
+        end
+    end
+    return alphaexc
 end
 
 """

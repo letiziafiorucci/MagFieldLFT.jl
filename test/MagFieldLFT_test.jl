@@ -124,6 +124,14 @@ function test_Z_summand()
     return MagFieldLFT.Z_summand(i,P,N,M) == 11
 end
 
+function test_calc_exc_equal()
+    SD = [1,2]
+    norb = 3
+    channel = 'α'
+    exc = MagFieldLFT.calc_exc_equal(SD, norb, channel)
+    return exc == [(6,2,1,-1), (8,3,1,-1)]
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_iscanonical1()
     @test test_iscanonical2()
@@ -140,4 +148,5 @@ end
     @test test_SD2index()
     @test test_Z_summand()
     @test test_ERIs_symmetries()
+    @test test_calc_exc_equal()
 end
