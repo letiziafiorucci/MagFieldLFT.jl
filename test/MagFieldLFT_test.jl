@@ -152,6 +152,15 @@ function test_calc_exc_occ2self()
     return test_alpha && test_beta
 end
 
+function test_calc_exclists()
+    l = 1
+    N = 2
+    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(1,2)
+    test1 = Lalpha[1] == [(1,1,1,1), (6,2,1,-1), (8,3,1,-1)]
+    test2 = Lminus[10] == [(7,1,2,1), (14,3,2,-1)]
+    return test1 && test2
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_iscanonical1()
     @test test_iscanonical2()
@@ -171,4 +180,5 @@ end
     @test test_calc_exc_equal()
     @test test_calc_exc_minus()
     @test test_calc_exc_occ2self()
+    @test test_calc_exclists()
 end

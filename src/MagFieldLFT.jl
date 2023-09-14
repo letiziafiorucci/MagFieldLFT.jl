@@ -269,18 +269,60 @@ function calc_exc_occ2self(SD::Vector{Int64}, norb::Int, channel::Char)
     return exc
 end
 
-"""
-Outline of implementation:
-
-function calc_H_nonrel(hLFT, F_k)
-    ERIs = calc_ERIs(F_k)
-    h_mod = calc_hmod(hLFT, ERIs)
-    H_single = calc_singletop(h_mod)   # same function can also be used for angular momentum matrices
-    H_double = calc_double_exc(ERIs)
-    return H_single + H_double
+function calc_hmod(hLFT::Matrix{Float64}, ERIs::Array{Float64, 4})
+    hmod = deepcopy(hLFT)
+    dim = size(hmod)[1]
+    for p in dim
+        for q in dim
+            for r in dim
+                hmod[p,q] -= 0.5* ERIs[p,r,r,q]
+            end
+        end
+    end
+    return hmod
 end
 
 """
+l: angular momentum of the partially filled shell (l=2 for d orbitals, l=3 for f orbitals).
+N: number of electrons in partially filled shell
+"""
+function calc_exclists(l::Int, N::Int)
+    norb = 2l+1
+    SDs = create_SDs(N, norb)
+    Dim = length(SDs)
+    L_alpha = Vector{Vector{NTuple{4, Int64}}}(undef, 0)
+    L_beta = Vector{Vector{NTuple{4, Int64}}}(undef, 0)
+    L_plus = Vector{Vector{NTuple{4, Int64}}}(undef, 0)
+    L_minus = Vector{Vector{NTuple{4, Int64}}}(undef, 0)
+    for K in 1:Dim
+        exc_alpha_diff = calc_exc_occ2unocc(SDs[K], norb, 'α', 'α')
+        exc_beta_diff = calc_exc_occ2unocc(SDs[K], norb, 'β', 'β')
+        exc_plus = calc_exc_occ2unocc(SDs[K], norb, 'α', 'β')
+        exc_minus = calc_exc_occ2unocc(SDs[K], norb, 'β', 'α')
+        exc_alpha_same = calc_exc_occ2self(SDs[K], norb, 'α')
+        exc_beta_same = calc_exc_occ2self(SDs[K], norb, 'β')
+        push!(L_alpha, [exc_alpha_same; exc_alpha_diff])
+        push!(L_beta, [exc_beta_same; exc_beta_diff])
+        push!(L_plus, exc_plus)
+        push!(L_minus, exc_minus)
+    end
+    return L_alpha, L_beta, L_plus, L_minus
+end
+
+
+function calc_singletop(int::Matrix{Float64})
+    return
+end
+
+function calc_H_nonrel(hLFT::Matrix{Float64}, F::Dict{Int64, Float64}, exclists_alpha, exclists_beta)
+    dim = size(hLFT)[1]
+    l = (dim-1)÷2
+    ERIs = calc_ERIs_real(l, F)
+    h_mod = calc_hmod(hLFT, ERIs)
+    H_single = calc_singletop(h_mod)
+    #H_double = calc_double_exc(ERIs)
+    #return H_single + H_double
+end
 
 
 end
