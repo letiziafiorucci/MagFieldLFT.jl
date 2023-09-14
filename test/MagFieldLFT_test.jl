@@ -127,9 +127,29 @@ end
 function test_calc_exc_equal()
     SD = [1,2]
     norb = 3
-    channel = 'α'
-    exc = MagFieldLFT.calc_exc_equal(SD, norb, channel)
+    sigma_p = 'α'
+    sigma_q = 'α'
+    exc = MagFieldLFT.calc_exc_occ2unocc(SD, norb, sigma_p, sigma_q)
     return exc == [(6,2,1,-1), (8,3,1,-1)]
+end
+
+function test_calc_exc_minus()
+    SD = [3,4]
+    norb = 3
+    sigma_p = 'β'
+    sigma_q = 'α'
+    exc = MagFieldLFT.calc_exc_occ2unocc(SD, norb, sigma_p, sigma_q)
+    return exc == [(7,1,2,1), (14,3,2,-1)]
+end
+
+function test_calc_exc_occ2self()
+    SD = [1,2,4]
+    norb = 5
+    exc_alpha_self = MagFieldLFT.calc_exc_occ2self(SD, norb, 'α')
+    exc_beta_self = MagFieldLFT.calc_exc_occ2self(SD, norb,'β')
+    test_alpha = exc_alpha_self == [(2,1,1,1)]
+    test_beta = exc_beta_self == [(2,1,1,1), (2,2,2,1)]
+    return test_alpha && test_beta
 end
 
 @testset "MagFieldLFT.jl" begin
@@ -149,4 +169,6 @@ end
     @test test_Z_summand()
     @test test_ERIs_symmetries()
     @test test_calc_exc_equal()
+    @test test_calc_exc_minus()
+    @test test_calc_exc_occ2self()
 end

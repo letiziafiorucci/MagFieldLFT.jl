@@ -236,14 +236,15 @@ function SD2index(SD::Vector{Int64}, M::Int64)
     return I
 end
 
-function calc_exc_equal(SD::Vector{Int64}, norb::Int, channel::Char)
-    @assert channel == 'α' || channel == 'β'
-    occ = occ_list(SD, channel)
-    unocc = unocc_list(SD, norb, channel)
-    alphaexc = Array{Tuple{Int64, Int64, Int64, Int64}}(undef,0)
+function calc_exc_occ2unocc(SD::Vector{Int64}, norb::Int, sigma_p::Char, sigma_q::Char)
+    @assert sigma_p == 'α' || sigma_p == 'β'
+    @assert sigma_q == 'α' || sigma_q == 'β'
+    occ = occ_list(SD, sigma_q)
+    unocc = unocc_list(SD, norb, sigma_p)
+    exc = Array{Tuple{Int64, Int64, Int64, Int64}}(undef,0)
     for (i,q) in occ
         for p in unocc
-            P = orb2spinorbindex(p, channel)   # spin orbital index we are exciting to
+            P = orb2spinorbindex(p, sigma_p)   # spin orbital index we are exciting to
             SD_exc = deepcopy(SD)
             SD_exc[i] = P
             perm = sortperm(SD_exc)
@@ -251,10 +252,21 @@ function calc_exc_equal(SD::Vector{Int64}, norb::Int, channel::Char)
             perm = Permutation(perm)
             gamma = sign(perm)
             I = SD2index(SD_exc_canonical, 2norb)
-            push!(alphaexc, (I, p, q, gamma))
+            push!(exc, (I, p, q, gamma))
         end
     end
-    return alphaexc
+    return exc
+end
+
+function calc_exc_occ2self(SD::Vector{Int64}, norb::Int, channel::Char)
+    @assert channel == 'α' || channel == 'β'
+    occ = occ_list(SD, channel)
+    exc = Array{Tuple{Int64, Int64, Int64, Int64}}(undef,0)
+    K = SD2index(SD, 2norb)
+    for (i,q) in occ
+        push!(exc, (K, q, q, 1))
+    end
+    return exc
 end
 
 """
