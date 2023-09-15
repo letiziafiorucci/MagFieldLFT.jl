@@ -220,6 +220,28 @@ function test_calc_H_fieldfree()
     return E[1]≈E[5] && E[6]≈E[12] && E[13]≈E[21] && !(E[1]≈E[6]) && !(E[6]≈E[13])
 end
 
+"""
+This test checks for the total orbital angular momentum expectation value L(L+1)
+for the different terms.
+"""
+function test_calc_L()
+    l=2
+    N=2
+    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
+    norb = 2l+1
+    hLFT = zeros(norb,norb)
+    A = 1
+    B = 2
+    C = 4
+    F = MagFieldLFT.Racah2F(A,B,C)
+    H = MagFieldLFT.calc_H_nonrel(hLFT, F, Lalpha, Lbeta)
+    C = eigvecs(H)
+    Lx, Ly, Lz = MagFieldLFT.calc_L(l, Lalpha, Lbeta)
+    L2 = Lx*Lx + Ly*Ly + Lz*Lz
+    L2val = diag(C'*L2*C)
+    return L2val[1]≈12 && L2val[22]≈6 && L2val[27]≈2 && L2val[36]≈20 && (L2val[45]+1)≈1
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_iscanonical1()
     @test test_iscanonical2()
@@ -243,4 +265,5 @@ end
     @test test_calc_H_nonrel1()
     @test test_calc_H_nonrel2()
     @test test_calc_H_fieldfree()
+    @test test_calc_L()
 end

@@ -333,9 +333,9 @@ function calc_exclists(l::Int, N::Int)
     return L_alpha, L_beta, L_plus, L_minus
 end
 
-function calc_singletop(int::Matrix{Float64}, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}})
+function calc_singletop(int::Matrix{T}, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}}) where T<:Number
     Dim = length(L_alpha)
-    H_single = zeros(Dim, Dim)
+    H_single = convert(T, 0) * zeros(Dim, Dim)   # zero matrix with same type as int
     for J in 1:Dim
         for (Ii,pi,qi,gammai) in L_alpha[J]
             H_single[Ii,J] += int[pi,qi]*gammai
@@ -414,6 +414,17 @@ function calc_H_fieldfree(hLFT::Matrix{Float64}, F::Dict{Int64, Float64}, zeta::
     l = (norb-1)÷2
     return calc_H_nonrel(hLFT, F, L_alpha, L_beta) + calc_SOC(zeta, l, L_alpha, L_beta, L_plus, L_minus)
 end
+
+function calc_L(l::Int, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}})
+    lz, lplus, lminus = calc_lops_real(l::Int)
+    Lz = calc_singletop(lz, L_alpha, L_beta)
+    Lplus = calc_singletop(lplus, L_alpha, L_beta)
+    Lminus = calc_singletop(lminus, L_alpha, L_beta)
+    Lx = (Lplus + Lminus)/2
+    Ly = (Lplus - Lminus)/(2im)
+    return Lx, Ly, Lz
+end
+
 
 
 
