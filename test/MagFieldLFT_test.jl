@@ -48,7 +48,7 @@ function test_calc_lops()
                   0 sqrt(6) 0 0 0;
                   0 0 sqrt(6) 0 0;
                   0 0 0 2 0]
-    lz, lplus, lminus = MagFieldLFT.calc_lops(l)
+    lz, lplus, lminus = MagFieldLFT.calc_lops_complex(l)
     return lz ≈ ref_lz && lplus ≈ ref_lplus && lminus ≈ ref_lminus
 end
 
@@ -204,6 +204,22 @@ function test_calc_H_nonrel2()
     return E[1]≈-15 && E[22]≈3 && E[27]≈15 && E[36]≈17 && E[45]≈57
 end
 
+function test_calc_H_fieldfree()
+    l=2
+    N=2
+    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
+    norb = 2l+1
+    hLFT = zeros(norb,norb)
+    A = 1
+    B = 2
+    C = 4
+    F = MagFieldLFT.Racah2F(A,B,C)
+    zeta = 0.5
+    H = MagFieldLFT.calc_H_fieldfree(hLFT, F, zeta, Lalpha, Lbeta, Lplus, Lminus)
+    E = eigvals(H)
+    return E[1]≈E[5] && E[6]≈E[12] && E[13]≈E[21] && !(E[1]≈E[6]) && !(E[6]≈E[13])
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_iscanonical1()
     @test test_iscanonical2()
@@ -226,4 +242,5 @@ end
     @test test_calc_exclists()
     @test test_calc_H_nonrel1()
     @test test_calc_H_nonrel2()
+    @test test_calc_H_fieldfree()
 end

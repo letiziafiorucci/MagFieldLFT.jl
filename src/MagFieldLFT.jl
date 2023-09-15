@@ -48,6 +48,7 @@ c1_0 = Matrix(1.0I, 3, 3)
 c1_2 = [-1 sqrt(3) -sqrt(6);
         -sqrt(3) 2 -sqrt(3);
         -sqrt(6) sqrt(3) -1]
+
 c2_0 = Matrix(1.0I, 5, 5)
 c2_2 = [-2 sqrt(6) -2 0 0;
         -sqrt(6) 1 1 -sqrt(6) 0;
@@ -98,11 +99,16 @@ c_matrices = Dict((1,0) => c1_0,
                   (3,4) => c3_4,
                   (3,6) => c3_6)
 
+"""
+Convert Racah parameters for a shell of d orbitals
+into Slater--Condon parameters.
+"""
 function Racah2F(A::Real, B::Real, C::Real)
     return Dict(0 => A+(7/5)*C, 2 => B+(1/7)*C, 4 => C/35)
 end
+
 """
-Calculate lz operator in basis of complex spherically symmetric orbitals.
+Calculate lz operator in basis of complex atomic orbitals.
 """
 calc_lz(l::Int) = diagm(l:-1:-l)
 
@@ -123,8 +129,17 @@ function calc_lplusminus(l::Int, sign::Int)
     return op
 end
 
-function calc_lops(l::Int)
+"""
+Returns lz, lplus, lminus in basis of complex atomic orbitals of angular momentum l.
+"""
+function calc_lops_complex(l::Int)
     return calc_lz(l), calc_lplusminus(l,+1), calc_lplusminus(l,-1)
+end
+
+function calc_lops_real(l::Int)
+    lz, lplus, lminus = calc_lops_complex(l)
+    U = U_complex2real(l)
+    return U'*lz*U, U'*lplus*U, U'*lminus*U
 end
 
 """
@@ -318,7 +333,6 @@ function calc_exclists(l::Int, N::Int)
     return L_alpha, L_beta, L_plus, L_minus
 end
 
-
 function calc_singletop(int::Matrix{Float64}, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}})
     Dim = length(L_alpha)
     H_single = zeros(Dim, Dim)
@@ -368,6 +382,39 @@ function calc_H_nonrel(hLFT::Matrix{Float64}, F::Dict{Int64, Float64}, L_alpha::
     H_double = calc_double_exc(ERIs, L_alpha, L_beta)
     return H_single + H_double
 end
+
+"""
+zeta: SOC parameter
+l: angular momentum of partially filled shell
+L_alpha, L_beta, L_plus, L_minus: Lists of excitations and coupling coefficients.
+"""
+function calc_SOC(zeta::Float64, l::Int, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}}, L_plus::Vector{Vector{NTuple{4, Int64}}}, L_minus::Vector{Vector{NTuple{4, Int64}}})
+    Dim = length(L_alpha)
+    H_SOC = im*zeros(Dim, Dim)
+    lz, lplus, lminus = calc_lops_real(l::Int)
+    for J in 1:Dim
+        for (Ii,pi,qi,gammai) in L_minus[J]
+            H_SOC[Ii,J] += 0.5*zeta*lplus[pi,qi]*gammai
+        end
+        for (Ii,pi,qi,gammai) in L_plus[J]
+            H_SOC[Ii,J] += 0.5*zeta*lminus[pi,qi]*gammai
+        end
+        for (Ii,pi,qi,gammai) in L_alpha[J]
+            H_SOC[Ii,J] += 0.5*zeta*lz[pi,qi]*gammai
+        end
+        for (Ii,pi,qi,gammai) in L_beta[J]
+            H_SOC[Ii,J] -= 0.5*zeta*lz[pi,qi]*gammai
+        end
+    end
+    return H_SOC
+end
+
+function calc_H_fieldfree(hLFT::Matrix{Float64}, F::Dict{Int64, Float64}, zeta::Float64, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}}, L_plus::Vector{Vector{NTuple{4, Int64}}}, L_minus::Vector{Vector{NTuple{4, Int64}}})
+    norb = size(hLFT)[1]
+    l = (norb-1)÷2
+    return calc_H_nonrel(hLFT, F, L_alpha, L_beta) + calc_SOC(zeta, l, L_alpha, L_beta, L_plus, L_minus)
+end
+
 
 
 end
