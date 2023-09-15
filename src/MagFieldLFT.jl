@@ -44,6 +44,10 @@ function U_complex2real(l::Int)
     return U
 end
 
+c1_0 = Matrix(1.0I, 3, 3)
+c1_2 = [-1 sqrt(3) -sqrt(6);
+        -sqrt(3) 2 -sqrt(3);
+        -sqrt(6) sqrt(3) -1]
 c2_0 = Matrix(1.0I, 5, 5)
 c2_2 = [-2 sqrt(6) -2 0 0;
         -sqrt(6) 1 1 -sqrt(6) 0;
@@ -56,7 +60,7 @@ c2_4 = [1 -sqrt(5) sqrt(15) -sqrt(35) sqrt(70);
         sqrt(35) -sqrt(40) sqrt(30) -4 sqrt(5);
         sqrt(70) -sqrt(35) sqrt(15) -sqrt(5) 1]
 
-c3_0 = Matrix(1.0I, 7,7)
+c3_0 = Matrix(1.0I, 7, 7)
 c3_2 = [-5 5 -sqrt(10) 0 0 0 0;
         -5 0 sqrt(15) -sqrt(20) 0 0 0;
         -sqrt(10) -sqrt(15) 3 sqrt(2) -sqrt(24) 0 0;
@@ -84,7 +88,9 @@ Keys are tuples (l,k), where l is the angular momentum
 quantum number (e.g. l=2 for d orbitals) and k the index
 of the Slater--Condon parameters.
 """
-c_matrices = Dict((2,0) => c2_0,
+c_matrices = Dict((1,0) => c1_0,
+                  (1,2) => c1_2,
+                  (2,0) => c2_0,
                   (2,2) => c2_2,
                   (2,4) => c2_4,
                   (3,0) => c3_0,
@@ -92,6 +98,9 @@ c_matrices = Dict((2,0) => c2_0,
                   (3,4) => c3_4,
                   (3,6) => c3_6)
 
+function Racah2F(A::Real, B::Real, C::Real)
+    return Dict(0 => A+(7/5)*C, 2 => B+(1/7)*C, 4 => C/35)
+end
 """
 Calculate lz operator in basis of complex spherically symmetric orbitals.
 """

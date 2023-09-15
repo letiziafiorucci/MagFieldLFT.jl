@@ -163,12 +163,16 @@ end
 
 function test_calc_H_nonrel()
     l=2
-    N=1
+    N=2
     Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
     norb = 2l+1
     hLFT = zeros(norb,norb)
-    F = Dict(0=>3.2, 2=>1.72, 4=>2.20)
+    A = 1
+    B = 2
+    C = 3
+    F = MagFieldLFT.Racah2F(A,B,C)
     H = MagFieldLFT.calc_H_nonrel(hLFT, F, Lalpha, Lbeta)
+    E = eigvals(H)
     return false
 end
 
