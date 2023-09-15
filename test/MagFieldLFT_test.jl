@@ -242,6 +242,28 @@ function test_calc_L()
     return L2val[1]≈12 && L2val[22]≈6 && L2val[27]≈2 && L2val[36]≈20 && (L2val[45]+1)≈1
 end
 
+"""
+This test checks for the spin orbital angular momentum expectation value S(S+1)
+for the different terms.
+"""
+function test_calc_S()
+    l=2
+    N=2
+    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
+    norb = 2l+1
+    hLFT = zeros(norb,norb)
+    A = 1
+    B = 2
+    C = 4
+    F = MagFieldLFT.Racah2F(A,B,C)
+    H = MagFieldLFT.calc_H_nonrel(hLFT, F, Lalpha, Lbeta)
+    C = eigvecs(H)
+    Sx, Sy, Sz = MagFieldLFT.calc_S(l, Lalpha, Lbeta, Lplus, Lminus)
+    S2 = Sx*Sx + Sy*Sy + Sz*Sz
+    S2val = diag(C'*S2*C)
+    return S2val[1]≈2 && (S2val[22]+1)≈1 && S2val[27]≈2 && (S2val[36]+1)≈1 && (S2val[45]+1)≈1
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_iscanonical1()
     @test test_iscanonical2()
@@ -266,4 +288,5 @@ end
     @test test_calc_H_nonrel2()
     @test test_calc_H_fieldfree()
     @test test_calc_L()
+    @test test_calc_S()
 end

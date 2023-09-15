@@ -425,6 +425,31 @@ function calc_L(l::Int, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vecto
     return Lx, Ly, Lz
 end
 
+function calc_S(l::Int, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}}, L_plus::Vector{Vector{NTuple{4, Int64}}}, L_minus::Vector{Vector{NTuple{4, Int64}}})
+    norb = 2l+1
+    delta = Matrix{Float64}(1.0I, norb, norb)
+    Dim = length(L_alpha)
+    Sx = zeros(Dim, Dim)
+    Sy = im*zeros(Dim, Dim)
+    Sz = zeros(Dim, Dim)
+    for J in 1:Dim
+        for (Ii,pi,qi,gammai) in L_plus[J]
+            Sx[Ii,J] += delta[pi,qi]*gammai/2
+            Sy[Ii,J] += delta[pi,qi]*gammai/(2im)
+        end
+        for (Ii,pi,qi,gammai) in L_minus[J]
+            Sx[Ii,J] += delta[pi,qi]*gammai/2
+            Sy[Ii,J] -= delta[pi,qi]*gammai/(2im)
+        end
+        for (Ii,pi,qi,gammai) in L_alpha[J]
+            Sz[Ii,J] += delta[pi,qi]*gammai/2
+        end
+        for (Ii,pi,qi,gammai) in L_beta[J]
+            Sz[Ii,J] -= delta[pi,qi]*gammai/2
+        end
+    end
+    return Sx, Sy, Sz
+end
 
 
 
