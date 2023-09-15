@@ -155,10 +155,21 @@ end
 function test_calc_exclists()
     l = 1
     N = 2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(1,2)
+    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
     test1 = Lalpha[1] == [(1,1,1,1), (6,2,1,-1), (8,3,1,-1)]
     test2 = Lminus[10] == [(7,1,2,1), (14,3,2,-1)]
     return test1 && test2
+end
+
+function test_calc_H_nonrel()
+    l=2
+    N=1
+    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
+    norb = 2l+1
+    hLFT = zeros(norb,norb)
+    F = Dict(0=>3.2, 2=>1.72, 4=>2.20)
+    H = MagFieldLFT.calc_H_nonrel(hLFT, F, Lalpha, Lbeta)
+    return false
 end
 
 @testset "MagFieldLFT.jl" begin
@@ -181,4 +192,5 @@ end
     @test test_calc_exc_minus()
     @test test_calc_exc_occ2self()
     @test test_calc_exclists()
+    @test_broken test_calc_H_nonrel()
 end

@@ -310,18 +310,54 @@ function calc_exclists(l::Int, N::Int)
 end
 
 
-function calc_singletop(int::Matrix{Float64})
-    return
+function calc_singletop(int::Matrix{Float64}, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}})
+    Dim = length(L_alpha)
+    H_single = zeros(Dim, Dim)
+    for J in 1:Dim
+        for (Ii,pi,qi,gammai) in L_alpha[J]
+            H_single[Ii,J] += int[pi,qi]*gammai
+        end
+        for (Ii,pi,qi,gammai) in L_beta[J]
+            H_single[Ii,J] += int[pi,qi]*gammai
+        end
+    end
+    return H_single
 end
 
-function calc_H_nonrel(hLFT::Matrix{Float64}, F::Dict{Int64, Float64}, exclists_alpha, exclists_beta)
-    dim = size(hLFT)[1]
-    l = (dim-1)÷2
-    ERIs = calc_ERIs_real(l, F)
+function calc_double_exc(ERIs::Array{Float64, 4}, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}})
+    Dim = length(L_alpha)
+    norb = size(ERIs)[1]
+    H_double = zeros(Dim, Dim)
+    for K in 1:Dim
+        X = zeros(Dim, norb, norb)
+        for p in 1:norb, q in 1:norb
+            for (Ii,pi,qi,gammai) in L_alpha[K]
+                X[Ii,p,q] += ERIs[p,q,qi,pi] * gammai
+            end
+            for (Ii,pi,qi,gammai) in L_beta[K]
+                X[Ii,p,q] += ERIs[p,q,qi,pi] * gammai
+            end
+        end
+        for J in 1:Dim
+            for (Ii,pi,qi,gammai) in L_alpha[K]
+                H_double[Ii, J] += 0.5*gammai*X[J,pi,qi]
+            end
+            for (Ii,pi,qi,gammai) in L_beta[K]
+                H_double[Ii, J] += 0.5*gammai*X[J,pi,qi]
+            end
+        end
+    end
+    return H_double
+end
+
+function calc_H_nonrel(hLFT::Matrix{Float64}, F::Dict{Int64, Float64}, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}})
+    norb = size(hLFT)[1]
+    l = (norb-1)÷2
+    ERIs = calcERIs_real(l, F)
     h_mod = calc_hmod(hLFT, ERIs)
-    H_single = calc_singletop(h_mod)
-    #H_double = calc_double_exc(ERIs)
-    #return H_single + H_double
+    H_single = calc_singletop(h_mod, L_alpha, L_beta)
+    H_double = calc_double_exc(ERIs, L_alpha, L_beta)
+    return H_single + H_double
 end
 
 
