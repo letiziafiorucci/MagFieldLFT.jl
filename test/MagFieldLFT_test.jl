@@ -161,7 +161,19 @@ function test_calc_exclists()
     return test1 && test2
 end
 
-function test_calc_H_nonrel()
+function test_calc_H_nonrel1()
+    l=1
+    N=1
+    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
+    norb = 2l+1
+    hLFT = zeros(norb,norb)
+    F = Dict(0 => 1.0, 2 => 2.0)
+    H = MagFieldLFT.calc_H_nonrel(hLFT, F, Lalpha, Lbeta)
+    E = eigvals(H)
+    return false
+end
+
+function test_calc_H_nonrel2()
     l=2
     N=2
     Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
@@ -174,6 +186,31 @@ function test_calc_H_nonrel()
     H = MagFieldLFT.calc_H_nonrel(hLFT, F, Lalpha, Lbeta)
     E = eigvals(H)
     return false
+end
+
+function test_calc_H_nonrel3()
+    l=1
+    norb = 2l+1
+    N = 1
+    ERIs = zeros(3,3,3,3)
+    #ERIs[1,1,1,1] = 1
+    #ERIs[1,2,1,1] = ERIs[2,1,1,1] = ERIs[1,1,1,2] = ERIs[1,1,2,1] = 2
+    #ERIs[1,3,1,1] = ERIs[3,1,1,1] = ERIs[1,1,1,3] = ERIs[1,1,3,1] = 3
+    #ERIs[2,2,1,1] = ERIs[1,1,2,2] = 4
+    #ERIs[2,3,1,1] = ERIs[3,2,1,1] = ERIs[1,1,2,3] = ERIs[1,1,3,2] = 5
+    #ERIs[3,3,1,1] = ERIs[1,1,3,3] = 6
+    #ERIs[1,2,1,2] = ERIs[2,1,1,2] = ERIs[1,2,2,1] = ERIs[2,1,2,1] = 7
+    #ERIs[1,3,1,2] = ERIs[3,1,1,2] = ERIs[1,3,2,1] = ERIs[3,1,2,1] = ERIs[1,2,1,3] = ERIs[2,1,1,3] = ERIs[1,2,3,1] = ERIs[2,1,3,1] = 8
+    # The following definition of ERIs does not respect the permutation symmetry
+    # but that does not matter for the current test
+    ERIs[1,1,1,1] = 1
+    ERIs[1,2,2,1] = 2
+    ERIs[1,3,3,1] = 3
+    hLFT = zeros(norb,norb)
+    h_mod = MagFieldLFT.calc_hmod(hLFT, ERIs)
+    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
+    H_single = MagFieldLFT.calc_singletop(h_mod, Lalpha, Lbeta)
+    H_double = MagFieldLFT.calc_double_exc(ERIs, Lalpha, Lbeta)
 end
 
 @testset "MagFieldLFT.jl" begin
@@ -196,5 +233,6 @@ end
     @test test_calc_exc_minus()
     @test test_calc_exc_occ2self()
     @test test_calc_exclists()
-    @test_broken test_calc_H_nonrel()
+    @test_broken test_calc_H_nonrel1()
+    @test_broken test_calc_H_nonrel2()
 end

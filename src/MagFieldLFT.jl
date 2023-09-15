@@ -281,9 +281,9 @@ end
 function calc_hmod(hLFT::Matrix{Float64}, ERIs::Array{Float64, 4})
     hmod = deepcopy(hLFT)
     dim = size(hmod)[1]
-    for p in dim
-        for q in dim
-            for r in dim
+    for p in 1:dim
+        for q in 1:dim
+            for r in 1:dim
                 hmod[p,q] -= 0.5* ERIs[p,r,r,q]
             end
         end
