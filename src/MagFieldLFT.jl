@@ -44,40 +44,40 @@ function U_complex2real(l::Int)
     return U
 end
 
-c2_0 = Matrix(1.0I, 5,5)
-c2_2 = (1/7)*[-2 sqrt(6) -2 0 0;
-            -sqrt(6) 1 1 -sqrt(6) 0;
-            -2 -1 2 -1 -2;
-            0 -sqrt(6) 1 1 -sqrt(6);
-            0 0 -2 sqrt(6) -2]
-c2_4 = (1/21)*[1 -sqrt(5) sqrt(15) -sqrt(35) sqrt(70);
-               sqrt(5) -4 sqrt(30) -sqrt(40) sqrt(35);
-               sqrt(15) -sqrt(30) 6 -sqrt(30) sqrt(15);
-               sqrt(35) -sqrt(40) sqrt(30) -4 sqrt(5);
-               sqrt(70) -sqrt(35) sqrt(15) -sqrt(5) 1]
+c2_0 = Matrix(1.0I, 5, 5)
+c2_2 = [-2 sqrt(6) -2 0 0;
+        -sqrt(6) 1 1 -sqrt(6) 0;
+        -2 -1 2 -1 -2;
+        0 -sqrt(6) 1 1 -sqrt(6);
+        0 0 -2 sqrt(6) -2]
+c2_4 = [1 -sqrt(5) sqrt(15) -sqrt(35) sqrt(70);
+        sqrt(5) -4 sqrt(30) -sqrt(40) sqrt(35);
+        sqrt(15) -sqrt(30) 6 -sqrt(30) sqrt(15);
+        sqrt(35) -sqrt(40) sqrt(30) -4 sqrt(5);
+        sqrt(70) -sqrt(35) sqrt(15) -sqrt(5) 1]
 
 c3_0 = Matrix(1.0I, 7,7)
-c3_2 = (1/15)*[-5 5 -sqrt(10) 0 0 0 0;
-               -5 0 sqrt(15) -sqrt(20) 0 0 0;
-               -sqrt(10) -sqrt(15) 3 sqrt(2) -sqrt(24) 0 0;
-               0 -sqrt(20) -sqrt(2) 4 -sqrt(2) -sqrt(20) 0;
-               0 0 -sqrt(24) sqrt(2) 3 -sqrt(15) -sqrt(10);
-               0 0 0 -sqrt(20) sqrt(15) 0 -5;
-               0 0 0 0 -sqrt(10) 5 -5]
-c3_4 = (1/33)*[3 -sqrt(30) sqrt(54) -sqrt(63) sqrt(42) 0 0;
-               sqrt(30) -7 4*sqrt(2) -sqrt(3) -sqrt(14) sqrt(70) 0;
-               sqrt(54) -4*sqrt(2) 1 sqrt(15) -sqrt(40) sqrt(14) sqrt(42);
-               sqrt(63) -sqrt(3) -sqrt(15) 6 -sqrt(15) -sqrt(3) sqrt(63);
-               sqrt(42) sqrt(14) -sqrt(40) sqrt(15) 1 -4*sqrt(2) sqrt(54);
-               0 sqrt(70) -sqrt(14) -sqrt(3) 4*sqrt(2) -7 sqrt(30);
-               0 0 sqrt(42) -sqrt(63) sqrt(54) -sqrt(30) 3]
-c3_6 = (5/429)*[-1 sqrt(7) -sqrt(28) sqrt(84) -sqrt(210) sqrt(462) -sqrt(924);
-                -sqrt(7) 6 -sqrt(105) 4*sqrt(14) -sqrt(378) sqrt(504) -sqrt(462);
-                -sqrt(28) sqrt(105) -15 5*sqrt(14) -sqrt(420) sqrt(378) -sqrt(210);
-                -sqrt(84) 4*sqrt(14) -5*sqrt(14) 20 -5*sqrt(14) 4*sqrt(14) -sqrt(84);
-                -sqrt(210) sqrt(378) -sqrt(420) 5*sqrt(14) -15 sqrt(105) -sqrt(28);
-                -sqrt(462) sqrt(504) -sqrt(378) 4*sqrt(14) -sqrt(105) 6 -sqrt(7);
-                -sqrt(924) sqrt(462) -sqrt(210) sqrt(84) -sqrt(28) sqrt(7) -1]
+c3_2 = [-5 5 -sqrt(10) 0 0 0 0;
+        -5 0 sqrt(15) -sqrt(20) 0 0 0;
+        -sqrt(10) -sqrt(15) 3 sqrt(2) -sqrt(24) 0 0;
+        0 -sqrt(20) -sqrt(2) 4 -sqrt(2) -sqrt(20) 0;
+        0 0 -sqrt(24) sqrt(2) 3 -sqrt(15) -sqrt(10);
+        0 0 0 -sqrt(20) sqrt(15) 0 -5;
+        0 0 0 0 -sqrt(10) 5 -5]
+c3_4 = [3 -sqrt(30) sqrt(54) -sqrt(63) sqrt(42) 0 0;
+        sqrt(30) -7 4*sqrt(2) -sqrt(3) -sqrt(14) sqrt(70) 0;
+        sqrt(54) -4*sqrt(2) 1 sqrt(15) -sqrt(40) sqrt(14) sqrt(42);
+        sqrt(63) -sqrt(3) -sqrt(15) 6 -sqrt(15) -sqrt(3) sqrt(63);
+        sqrt(42) sqrt(14) -sqrt(40) sqrt(15) 1 -4*sqrt(2) sqrt(54);
+        0 sqrt(70) -sqrt(14) -sqrt(3) 4*sqrt(2) -7 sqrt(30);
+        0 0 sqrt(42) -sqrt(63) sqrt(54) -sqrt(30) 3]
+c3_6 = [-1 sqrt(7) -sqrt(28) sqrt(84) -sqrt(210) sqrt(462) -sqrt(924);
+        -sqrt(7) 6 -sqrt(105) 4*sqrt(14) -sqrt(378) sqrt(504) -sqrt(462);
+        -sqrt(28) sqrt(105) -15 5*sqrt(14) -sqrt(420) sqrt(378) -sqrt(210);
+        -sqrt(84) 4*sqrt(14) -5*sqrt(14) 20 -5*sqrt(14) 4*sqrt(14) -sqrt(84);
+        -sqrt(210) sqrt(378) -sqrt(420) 5*sqrt(14) -15 sqrt(105) -sqrt(28);
+        -sqrt(462) sqrt(504) -sqrt(378) 4*sqrt(14) -sqrt(105) 6 -sqrt(7);
+        -sqrt(924) sqrt(462) -sqrt(210) sqrt(84) -sqrt(28) sqrt(7) -1]
 
 """
 Keys are tuples (l,k), where l is the angular momentum

@@ -53,14 +53,14 @@ function test_calc_lops()
 end
 
 function test_calcERIs_complex()
-    F = Dict(0=>3.2, 2=>1.72, 4=>2.20)
+    F = Dict(0=>3.2, 2=>(1/7/7)*1.72, 4=>(1/21/21)*2.20)
     l = 2
     ERIs = MagFieldLFT.calcERIs_complex(l, F)
     return ERIs[2,1,4,5] ≈ (-2.12/9) && ERIs[3,2,5,5] ≈ 0.0 && ERIs[2,2,5,5] ≈ (195.92/63)
 end
 
 function test_calcERIs_real()
-    F = Dict(0=>3.2, 2=>1.72, 4=>2.20)
+    F = Dict(0=>3.2, 2=>(1/7/7)*1.72, 4=>(1/21/21)*2.20)
     l = 2
     ERIs = MagFieldLFT.calcERIs_real(l, F)
     return ERIs[2,2,5,5] ≈ (195.92/63) && ERIs[1,4,2,5] ≈ (-0.64/21)
