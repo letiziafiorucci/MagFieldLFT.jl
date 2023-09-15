@@ -264,6 +264,33 @@ function test_calc_S()
     return S2val[1]≈2 && (S2val[22]+1)≈1 && S2val[27]≈2 && (S2val[36]+1)≈1 && (S2val[45]+1)≈1
 end
 
+"""
+This test checks for the total angular momentum expectation value J(J+1)
+for the lowest three spin-orbit-coupled terms (originating from 3F term).
+"""
+function test_total_J()
+    l=2
+    N=2
+    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
+    norb = 2l+1
+    hLFT = zeros(norb,norb)
+    A = 1
+    B = 2
+    C = 4
+    F = MagFieldLFT.Racah2F(A,B,C)
+    zeta = 0.5
+    H = MagFieldLFT.calc_H_fieldfree(hLFT, F, zeta, Lalpha, Lbeta, Lplus, Lminus)
+    C = eigvecs(H)
+    Lx, Ly, Lz = MagFieldLFT.calc_L(l, Lalpha, Lbeta)
+    Sx, Sy, Sz = MagFieldLFT.calc_S(l, Lalpha, Lbeta, Lplus, Lminus)
+    Jx = Lx+Sx
+    Jy = Ly+Sy
+    Jz = Lz+Sz
+    J2 = Jx*Jx + Jy*Jy + Jz*Jz
+    J2val = diag(C'*J2*C)
+    return J2val[1]≈6 && J2val[6]≈12 && J2val[13]≈20
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_iscanonical1()
     @test test_iscanonical2()
@@ -289,4 +316,5 @@ end
     @test test_calc_H_fieldfree()
     @test test_calc_L()
     @test test_calc_S()
+    @test test_total_J()
 end
