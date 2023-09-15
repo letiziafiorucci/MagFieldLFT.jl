@@ -166,7 +166,7 @@ For 2 electrons in a shell of p orbitals, there are the following terms with the
 E(3P) = F0 - 5*F2
 E(1D) = F0 + F2
 E(1S) = F0 + 10*F2
-(see Griffith (the theory of transition-metal ions) Ch. 4.5)
+(see Griffith (the theory of transition-metal ions) Chapter 4.5)
 """
 function test_calc_H_nonrel1()
     l=1
@@ -180,6 +180,15 @@ function test_calc_H_nonrel1()
     return E[1]≈-9 && E[9]≈-9 && E[10]≈3 && E[14]≈3 && E[15]≈21
 end
 
+"""
+For 2 electrons in a shell of d orbitals, there are the following terms with their energies:
+E(3F) = A - 8*B
+E(1D) = A - 3*B + 2*C
+E(3P) = A + 7*B
+E(1G) = A + 4*B + 2*C
+E(1S) = A + 14*B + 7*C
+(see Griffith (the theory of transition-metal ions) Table 4.6)
+"""
 function test_calc_H_nonrel2()
     l=2
     N=2
@@ -188,36 +197,11 @@ function test_calc_H_nonrel2()
     hLFT = zeros(norb,norb)
     A = 1
     B = 2
-    C = 3
+    C = 4
     F = MagFieldLFT.Racah2F(A,B,C)
     H = MagFieldLFT.calc_H_nonrel(hLFT, F, Lalpha, Lbeta)
     E = eigvals(H)
-    return false
-end
-
-function test_calc_H_nonrel3()
-    l=1
-    norb = 2l+1
-    N = 1
-    ERIs = zeros(3,3,3,3)
-    #ERIs[1,1,1,1] = 1
-    #ERIs[1,2,1,1] = ERIs[2,1,1,1] = ERIs[1,1,1,2] = ERIs[1,1,2,1] = 2
-    #ERIs[1,3,1,1] = ERIs[3,1,1,1] = ERIs[1,1,1,3] = ERIs[1,1,3,1] = 3
-    #ERIs[2,2,1,1] = ERIs[1,1,2,2] = 4
-    #ERIs[2,3,1,1] = ERIs[3,2,1,1] = ERIs[1,1,2,3] = ERIs[1,1,3,2] = 5
-    #ERIs[3,3,1,1] = ERIs[1,1,3,3] = 6
-    #ERIs[1,2,1,2] = ERIs[2,1,1,2] = ERIs[1,2,2,1] = ERIs[2,1,2,1] = 7
-    #ERIs[1,3,1,2] = ERIs[3,1,1,2] = ERIs[1,3,2,1] = ERIs[3,1,2,1] = ERIs[1,2,1,3] = ERIs[2,1,1,3] = ERIs[1,2,3,1] = ERIs[2,1,3,1] = 8
-    # The following definition of ERIs does not respect the permutation symmetry
-    # but that does not matter for the current test
-    ERIs[1,1,1,1] = 1
-    ERIs[1,2,2,1] = 2
-    ERIs[1,3,3,1] = 3
-    hLFT = zeros(norb,norb)
-    h_mod = MagFieldLFT.calc_hmod(hLFT, ERIs)
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
-    H_single = MagFieldLFT.calc_singletop(h_mod, Lalpha, Lbeta)
-    H_double = MagFieldLFT.calc_double_exc(ERIs, Lalpha, Lbeta)
+    return E[1]≈-15 && E[22]≈3 && E[27]≈15 && E[36]≈17 && E[45]≈57
 end
 
 @testset "MagFieldLFT.jl" begin
@@ -241,5 +225,5 @@ end
     @test test_calc_exc_occ2self()
     @test test_calc_exclists()
     @test test_calc_H_nonrel1()
-    @test_broken test_calc_H_nonrel2()
+    @test test_calc_H_nonrel2()
 end
