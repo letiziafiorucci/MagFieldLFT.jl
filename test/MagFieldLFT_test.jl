@@ -1,4 +1,4 @@
-using Test
+using Test, LinearAlgebra
 
 using MagFieldLFT
 
@@ -161,16 +161,23 @@ function test_calc_exclists()
     return test1 && test2
 end
 
+"""
+For 2 electrons in a shell of p orbitals, there are the following terms with their energies:
+E(3P) = F0 - 5*F2
+E(1D) = F0 + F2
+E(1S) = F0 + 10*F2
+(see Griffith (the theory of transition-metal ions) Ch. 4.5)
+"""
 function test_calc_H_nonrel1()
     l=1
-    N=1
+    N=2
     Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
     norb = 2l+1
     hLFT = zeros(norb,norb)
     F = Dict(0 => 1.0, 2 => 2.0)
     H = MagFieldLFT.calc_H_nonrel(hLFT, F, Lalpha, Lbeta)
     E = eigvals(H)
-    return false
+    return E[1]≈-9 && E[9]≈-9 && E[10]≈3 && E[14]≈3 && E[15]≈21
 end
 
 function test_calc_H_nonrel2()
@@ -233,6 +240,6 @@ end
     @test test_calc_exc_minus()
     @test test_calc_exc_occ2self()
     @test test_calc_exclists()
-    @test_broken test_calc_H_nonrel1()
+    @test test_calc_H_nonrel1()
     @test_broken test_calc_H_nonrel2()
 end
