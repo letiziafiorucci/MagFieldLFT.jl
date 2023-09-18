@@ -1,6 +1,8 @@
 module MagFieldLFT
 
-using LinearAlgebra, Permutations
+using LinearAlgebra, Permutations, OutputParser
+
+export read_AILFT_params_ORCA
 
 function iscanonical(orblist::Vector{T}) where T <: Int
     for i in 2:length(orblist)
@@ -449,6 +451,52 @@ function calc_S(l::Int, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vecto
         end
     end
     return Sx, Sy, Sz
+end
+
+"""
+Read parameters (in atomic units).
+method: e.g. "CASSCF" or "NEVPT2"
+TO DO: extend for f elements and for SOC parameter.
+"""
+function read_AILFT_params_ORCA(outfile::String, method::String)
+    nel = parse_int(outfile, ["nel"], 0, 3)
+    norb = parse_int(outfile, ["norb"], 0, 3)
+    if norb == 5
+        h_xy_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"], 4, 3)
+        h_yz_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"], 5, 3)
+        h_yz_yz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"], 6, 3)
+        h_z2_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"], 7, 3)
+        h_z2_yz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"], 8, 3)
+        h_z2_z2     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"], 9, 3)
+        h_xz_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],10, 3)
+        h_xz_yz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],11, 3)
+        h_xz_z2     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],12, 3)
+        h_xz_xz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],13, 3)
+        h_x2y2_xy   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],14, 2)
+        h_x2y2_yz   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],15, 2)
+        h_x2y2_z2   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],16, 2)
+        h_x2y2_xz   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],17, 2)
+        h_x2y2_x2y2 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],18, 1)
+        B           = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],19, 2)
+        C           = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],20, 2)
+    end
+    hLFT = Matrix{Float64}(undef, norb, norb)
+    hLFT[1,1] = h_x2y2_x2y2
+    hLFT[1,2] = hLFT[2,1] = h_x2y2_xz
+    hLFT[1,3] = hLFT[3,1] = h_x2y2_z2
+    hLFT[1,4] = hLFT[4,1] = h_x2y2_yz
+    hLFT[1,5] = hLFT[5,1] = h_x2y2_xy
+    hLFT[2,2] = h_xz_xz
+    hLFT[2,3] = hLFT[3,2] = h_xz_z2
+    hLFT[2,4] = hLFT[4,2] = h_xz_yz
+    hLFT[2,5] = hLFT[5,2] = h_xz_xy
+    hLFT[3,3] = h_z2_z2
+    hLFT[3,4] = hLFT[4,3] = h_z2_yz
+    hLFT[3,5] = hLFT[5,3] = h_z2_xy
+    hLFT[4,4] = h_yz_yz
+    hLFT[4,5] = hLFT[5,4] = h_yz_xy
+    hLFT[5,5] = h_xy_xy
+    return nel, norb, hLFT, B, C
 end
 
 

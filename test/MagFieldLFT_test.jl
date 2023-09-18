@@ -291,6 +291,22 @@ function test_total_J()
     return J2val[1]≈6 && J2val[6]≈12 && J2val[13]≈20
 end
 
+function test_read_AILFT_params_ORCA()
+    nel, norb, hLFT, B, C = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
+    l=(norb-1)÷2
+    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,nel)
+    A = 0 # just put some dummy value; this is not determined by AILFT program
+    F = MagFieldLFT.Racah2F(A,B,C)
+    H = MagFieldLFT.calc_H_nonrel(hLFT, F, Lalpha, Lbeta)
+    E = eigvals(H)
+    E = (E .- E[1])*27.211    # take ground state energy as reference and convert to eV
+    test1 = round(E[5], digits=3) == 1.638    # first excited quartet state
+    test2 = round(E[13], digits=3) == 1.645   # third excited quartet state
+    test3 = round(E[17], digits=3) == 2.398   # lowest doublet state
+    test4 = round(E[end], digits=3) == 9.930  # highest doublet state
+    return test1 && test2 && test3 && test4
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_iscanonical1()
     @test test_iscanonical2()
@@ -317,4 +333,5 @@ end
     @test test_calc_L()
     @test test_calc_S()
     @test test_total_J()
+    @test test_read_AILFT_params_ORCA()
 end

@@ -2,7 +2,7 @@
 
 julia_version = "1.9.2"
 manifest_format = "2.0"
-project_hash = "279d1097713defedcec8f36690f9c17313cf66d8"
+project_hash = "838995944991ac2995a9b1f8870a6870ba6ced1f"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -28,6 +28,11 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
 version = "0.3.21+4"
+
+[[deps.OutputParser]]
+path = "/home/llang/Dropbox/Postdoc/work/Programming/repos/OutputParser"
+uuid = "554c801b-3592-4aac-babc-bdcf42564d4b"
+version = "0.1.0"
 
 [[deps.Permutations]]
 deps = ["Combinatorics", "LinearAlgebra", "Random"]
