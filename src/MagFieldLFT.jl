@@ -462,23 +462,25 @@ function read_AILFT_params_ORCA(outfile::String, method::String)
     nel = parse_int(outfile, ["nel"], 0, 3)
     norb = parse_int(outfile, ["norb"], 0, 3)
     if norb == 5
-        h_xy_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"], 4, 3)
-        h_yz_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"], 5, 3)
-        h_yz_yz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"], 6, 3)
-        h_z2_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"], 7, 3)
-        h_z2_yz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"], 8, 3)
-        h_z2_z2     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"], 9, 3)
-        h_xz_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],10, 3)
-        h_xz_yz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],11, 3)
-        h_xz_z2     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],12, 3)
-        h_xz_xz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],13, 3)
-        h_x2y2_xy   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],14, 2)
-        h_x2y2_yz   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],15, 2)
-        h_x2y2_z2   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],16, 2)
-        h_x2y2_xz   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],17, 2)
-        h_x2y2_x2y2 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],18, 1)
-        B           = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],19, 2)
-        C           = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)"],20, 2)
+        h_z2_z2     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 1, 1)
+        h_xz_z2     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 1, 2)
+        h_z2_yz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 1, 3)
+        h_x2y2_z2   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 1, 4)
+        h_z2_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 1, 5)
+        h_xz_xz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 2, 2)
+        h_xz_yz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 2, 3)
+        h_x2y2_xz   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 2, 4)
+        h_xz_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 2, 5)
+        h_yz_yz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 3, 3)
+        h_x2y2_yz   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 3, 4)
+        h_yz_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 3, 5)
+        h_x2y2_x2y2 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 4, 4)
+        h_x2y2_xy   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 4, 5)
+        h_xy_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 5, 5)
+        A           = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Racah"], 2, 5)
+        B           = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Racah"], 3, 2)
+        C           = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Racah"], 4, 2)
+        zeta        = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "ZETA_D"], 0, 2)/219474.63  # convert from cm-1 to Hartree
     end
     hLFT = Matrix{Float64}(undef, norb, norb)
     hLFT[1,1] = h_x2y2_x2y2
@@ -496,7 +498,7 @@ function read_AILFT_params_ORCA(outfile::String, method::String)
     hLFT[4,4] = h_yz_yz
     hLFT[4,5] = hLFT[5,4] = h_yz_xy
     hLFT[5,5] = h_xy_xy
-    return nel, norb, hLFT, B, C
+    return nel, norb, hLFT, A, B, C, zeta
 end
 
 
