@@ -14,17 +14,28 @@ function iscanonical(orblist::Vector{T}) where T <: Int
 end
 
 function create_SDs(nel::Int, norb::Int)
-    SDs = Vector{Vector{Int64}}()
     nspinorb = 2*norb
-    spinorbrange = 1:nspinorb
-    allranges = Tuple(repeat([spinorbrange], nel))
-    for indices in CartesianIndices(allranges)
-        orblist = reverse(collect(Tuple(indices)))
-        if iscanonical(orblist)
-            push!(SDs, orblist)
-        end
+    SDs = [[P] for P in 1:(nspinorb-nel+1)]
+    if length(SDs[1])<nel
+        construct_SDs_recursive!(SDs, nspinorb, nel)
     end
     return SDs
+end
+
+function construct_SDs_recursive!(SDs::Vector{Vector{Int64}}, nspinorb::Int, nel::Int)
+    oldSDs = deepcopy(SDs)
+    deleteat!(SDs, 1:length(SDs))
+    for SD in oldSDs
+        for P in (SD[end]+1):nspinorb
+            newSD = deepcopy(SD)
+            push!(newSD, P)
+            push!(SDs, newSD)
+        end
+    end
+    if length(SDs[1])<nel
+        construct_SDs_recursive!(SDs, nspinorb, nel)
+    end
+    return nothing
 end
 
 function U_complex2real(l::Int)

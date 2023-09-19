@@ -19,7 +19,14 @@ end
 
 function test_createSDs()
     ref = [[1,2,3], [1,2,4], [1,3,4], [2,3,4]]
-    MagFieldLFT.create_SDs(3,2) == ref
+    return MagFieldLFT.create_SDs(3,2) == ref
+end
+
+function test_createSDs2()
+    nel = 1
+    norb = 2
+    ref = [[1], [2], [3], [4]]
+    return MagFieldLFT.create_SDs(nel, norb) == ref
 end
 
 function test_U_complex2real()
@@ -315,6 +322,7 @@ end
     @test test_iscanonical2()
     @test test_iscanonical3()
     @test test_createSDs()
+    @test test_createSDs2()
     @test test_U_complex2real()
     @test test_calc_lops()
     @test test_calcERIs_complex()
