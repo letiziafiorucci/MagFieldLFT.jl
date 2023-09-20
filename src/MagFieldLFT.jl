@@ -473,43 +473,37 @@ function read_AILFT_params_ORCA(outfile::String, method::String)
     nel = parse_int(outfile, ["nel"], 0, 3)
     norb = parse_int(outfile, ["norb"], 0, 3)
     if norb == 5
-        h_z2_z2     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 1, 1)
-        h_xz_z2     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 1, 2)
-        h_z2_yz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 1, 3)
-        h_x2y2_z2   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 1, 4)
-        h_z2_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 1, 5)
-        h_xz_xz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 2, 2)
-        h_xz_yz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 2, 3)
-        h_x2y2_xz   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 2, 4)
-        h_xz_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 2, 5)
-        h_yz_yz     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 3, 3)
-        h_x2y2_yz   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 3, 4)
-        h_yz_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 3, 5)
-        h_x2y2_x2y2 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 4, 4)
-        h_x2y2_xy   = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 4, 5)
-        h_xy_xy     = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], 5, 5)
-        A           = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Racah"], 2, 5)
-        B           = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Racah"], 3, 2)
-        C           = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Racah"], 4, 2)
-        zeta        = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "ZETA_D"], 0, 2)/219474.63  # convert from cm-1 to Hartree
+        hLFT = Matrix{Float64}(undef, norb, norb)
+        for row in 1:norb
+            for col in 1:norb
+                hLFT[row,col] = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], row, col)
+            end
+        end
+        perm = [4,2,1,3,5]    # change order from 0,1,-1,2,-2 (=x2-y2,xz,z2,yz,xy) to 2,1,0,-1,-2
+        hLFT = hLFT[perm, perm]
+        F0 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 2, 4)
+        F2 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 3, 2)
+        F4 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 4, 2)
+        F = Dict(0 => F0, 2 => F2/49, 4 => F4/441)
+        zeta = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "ZETA_D"], 0, 2)/219474.63  # convert from cm-1 to Hartree
     end
-    hLFT = Matrix{Float64}(undef, norb, norb)
-    hLFT[1,1] = h_x2y2_x2y2
-    hLFT[1,2] = hLFT[2,1] = h_x2y2_xz
-    hLFT[1,3] = hLFT[3,1] = h_x2y2_z2
-    hLFT[1,4] = hLFT[4,1] = h_x2y2_yz
-    hLFT[1,5] = hLFT[5,1] = h_x2y2_xy
-    hLFT[2,2] = h_xz_xz
-    hLFT[2,3] = hLFT[3,2] = h_xz_z2
-    hLFT[2,4] = hLFT[4,2] = h_xz_yz
-    hLFT[2,5] = hLFT[5,2] = h_xz_xy
-    hLFT[3,3] = h_z2_z2
-    hLFT[3,4] = hLFT[4,3] = h_z2_yz
-    hLFT[3,5] = hLFT[5,3] = h_z2_xy
-    hLFT[4,4] = h_yz_yz
-    hLFT[4,5] = hLFT[5,4] = h_yz_xy
-    hLFT[5,5] = h_xy_xy
-    return nel, norb, hLFT, A, B, C, zeta
+    if norb == 7
+        hLFT = Matrix{Float64}(undef, norb, norb)
+        for row in 1:norb
+            for col in 1:norb
+                hLFT[row,col] = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], row, col)
+            end
+        end
+        perm = [6,4,2,1,3,5,7]    # change order from 0,1,-1,2,-2,3,-3 to 3,2,1,0,-1,-2,-3
+        hLFT = hLFT[perm, perm]
+        F0 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 2, 2)
+        F2 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 3, 2)
+        F4 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 4, 2)
+        F6 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 5, 2)
+        F = Dict(0 => F0, 2 => F2/15/15, 4 => F4/33/33, 6 => (5/429)^2 * F6)
+        zeta = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "ZETA_F"], 0, 2)/219474.63  # convert from cm-1 to Hartree
+    end
+    return nel, norb, hLFT, F, zeta
 end
 
 

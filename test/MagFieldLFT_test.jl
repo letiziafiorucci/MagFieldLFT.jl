@@ -299,10 +299,9 @@ function test_total_J()
 end
 
 function test_read_AILFT_params_ORCA()
-    nel, norb, hLFT, A, B, C, zeta = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
+    nel, norb, hLFT, F, zeta = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
     l=(norb-1)÷2
     Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,nel)
-    F = MagFieldLFT.Racah2F(A,B,C)
     H = MagFieldLFT.calc_H_nonrel(hLFT, F, Lalpha, Lbeta)
     E = eigvals(H)
     E = (E .- E[1])*27.211    # take ground state energy as reference and convert to eV
@@ -315,6 +314,13 @@ function test_read_AILFT_params_ORCA()
     test3 = round(E[17], digits=3) == 2.398   # lowest doublet state
     test4 = round(E[end], digits=3) == 9.930  # highest doublet state
     return test1 && test2 && test3 && test4
+end
+
+function test_Cr_complex_SOC()
+    nel, norb, hLFT, F, zeta = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
+    l=(norb-1)÷2
+    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,nel)
+    H = MagFieldLFT.calc_H_fieldfree(hLFT, F, zeta, Lalpha, Lbeta, Lplus, Lminus)
 end
 
 @testset "MagFieldLFT.jl" begin
