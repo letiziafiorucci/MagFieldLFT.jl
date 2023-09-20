@@ -316,11 +316,17 @@ function test_read_AILFT_params_ORCA()
     return test1 && test2 && test3 && test4
 end
 
-function test_Cr_complex_SOC()
-    nel, norb, hLFT, F, zeta = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
+function test_Ercomplex_SOC()
+    nel, norb, hLFT, F, zeta = read_AILFT_params_ORCA("ErCl63-.out", "CASSCF")
     l=(norb-1)÷2
     Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,nel)
     H = MagFieldLFT.calc_H_fieldfree(hLFT, F, zeta, Lalpha, Lbeta, Lplus, Lminus)
+    E = eigvals(H)
+    E = (E .- E[1])*219474.63  # take ground state energy as reference and convert to cm-1
+    test1 = round(real(E[17]), digits=3) ==   5862.094
+    test2 = round(real(E[43]), digits=3) ==   12235.462
+    test3 = round(real(E[364]), digits=3) ==  118616.544
+    return test1 && test2 && test3
 end
 
 @testset "MagFieldLFT.jl" begin
@@ -351,4 +357,5 @@ end
     @test test_calc_S()
     @test test_total_J()
     @test_broken test_read_AILFT_params_ORCA()
+    @test test_Ercomplex_SOC()
 end
