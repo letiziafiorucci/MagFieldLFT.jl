@@ -506,6 +506,46 @@ function read_AILFT_params_ORCA(outfile::String, method::String)
     return nel, norb, hLFT, F, zeta
 end
 
+function calc_H_magfield(H_fieldfree::Matrix{ComplexF64}, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64})
+    return H_fieldfree + 0.5*(L[1]*B[1] + L[2]*B[2] + L[3]*B[3]) + S[1]*B[1] + S[2]*B[2] + S[3]*B[3]
+end
+
+function fieldfree_GS_energy(H_fieldfree::Matrix{ComplexF64})
+    energies = eigvals(H_fieldfree)
+    @assert norm(imag(energies)) < 1e-12    # energies need to be real
+    return real(energies[1])
+end
+
+function calc_free_energy(H_fieldfree::Matrix{ComplexF64}, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64}, T::Real)
+    E0 = fieldfree_GS_energy(H_fieldfree)
+    H_magfield = calc_H_magfield(H_fieldfree, L, S, B)
+    solution = eigen(H_magfield)
+    @assert norm(imag(solution.values)) < 1e-12    # energies need to be real
+    energies = real(solution.values) .- E0         # All energies relative to fieldfree GS energy
+    states = solution.vectors
+    kB = 3.166811563e-6    # Boltzmann constant in Eh/K
+    beta = 1/(kB*T)
+    energies_exp = exp.(-beta*energies)
+    Z = sum(energies_exp)   # canonical partition function
+    return -log(Z)/beta
+end
+
+
+# The following function does not work: yields NaNs
+#function calc_free_energy2(H_fieldfree::Matrix{ComplexF64}, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64}, T::Real)
+#    E0 = fieldfree_GS_energy(H_fieldfree)
+#    H_magfield = calc_H_magfield(H_fieldfree, L, S, B)
+#    Dim = size(H_magfield)[1]
+#    H_magfield_shifted = H_magfield - Matrix{Float64}(E0*I, Dim, Dim)  # All energies relative to fieldfree GS energy
+#    kB = 3.166811563e-6    # Boltzmann constant in Eh/K
+#    beta = 1/(kB*T)
+#    Z = tr(exp(-beta*H_magfield))   # canonical partition function
+#    println("Z: $Z")
+#    @assert norm(imag(Z)) < 1e-12   # partition function needs to be real
+#    return -log(real(Z))/beta
+#end
+
+
 
 
 end

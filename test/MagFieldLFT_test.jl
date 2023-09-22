@@ -329,6 +329,19 @@ function test_Ercomplex_SOC()
     return test1 && test2 && test3
 end
 
+function test_calc_free_energy()
+    nel, norb, hLFT, F, zeta = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
+    l=(norb-1)÷2
+    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,nel)
+    H_fieldfree = MagFieldLFT.calc_H_fieldfree(hLFT, F, zeta, Lalpha, Lbeta, Lplus, Lminus)
+    S = MagFieldLFT.calc_S(l, Lalpha, Lbeta, Lplus, Lminus)
+    L = MagFieldLFT.calc_L(l, Lalpha, Lbeta)
+    B = [0.0, 0.0, 1.0e-5]
+    T = 298.0
+    F1 = MagFieldLFT.calc_free_energy(H_fieldfree, L, S, B, T)
+    return F1 ≈ -0.0013082816934478216
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_iscanonical1()
     @test test_iscanonical2()
@@ -358,4 +371,5 @@ end
     @test test_total_J()
     @test_broken test_read_AILFT_params_ORCA()
     @test test_Ercomplex_SOC()
+    @test test_calc_free_energy()
 end
