@@ -416,7 +416,8 @@ end
 function calc_H_fieldfree(hLFT::Matrix{Float64}, F::Dict{Int64, Float64}, zeta::Float64, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}}, L_plus::Vector{Vector{NTuple{4, Int64}}}, L_minus::Vector{Vector{NTuple{4, Int64}}})
     norb = size(hLFT)[1]
     l = (norb-1)÷2
-    return calc_H_nonrel(hLFT, F, L_alpha, L_beta) + calc_SOC(zeta, l, L_alpha, L_beta, L_plus, L_minus)
+    H_fieldfree = calc_H_nonrel(hLFT, F, L_alpha, L_beta) + calc_SOC(zeta, l, L_alpha, L_beta, L_plus, L_minus)
+    return Hermitian(H_fieldfree)
 end
 
 function calc_L(l::Int, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}})
@@ -497,22 +498,25 @@ function read_AILFT_params_ORCA(outfile::String, method::String)
     return nel, norb, hLFT, F, zeta
 end
 
-function calc_H_magfield(H_fieldfree::Matrix{ComplexF64}, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64})
-    return H_fieldfree + 0.5*(L[1]*B[1] + L[2]*B[2] + L[3]*B[3]) + S[1]*B[1] + S[2]*B[2] + S[3]*B[3]
+const HermMat = Hermitian{ComplexF64, Matrix{ComplexF64}}   # Complex hermitian matrix
+
+function calc_H_magfield(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64})
+    H_magfield = H_fieldfree + 0.5*(L[1]*B[1] + L[2]*B[2] + L[3]*B[3]) + S[1]*B[1] + S[2]*B[2] + S[3]*B[3]
+    return Hermitian(H_magfield)    # this is important for the eigensolver to yield orthogonal eigenvectors
 end
 
-function fieldfree_GS_energy(H_fieldfree::Matrix{ComplexF64})
+function fieldfree_GS_energy(H_fieldfree::HermMat)
     energies = eigvals(H_fieldfree)
-    @assert norm(imag(energies)) < 1e-12    # energies need to be real
-    return real(energies[1])
+    @assert isa(energies, Vector{Float64})  # energies need to be real
+    return energies[1]
 end
 
-function calc_free_energy(H_fieldfree::Matrix{ComplexF64}, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64}, T::Real)
+function calc_free_energy(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64}, T::Real)
     E0 = fieldfree_GS_energy(H_fieldfree)
     H_magfield = calc_H_magfield(H_fieldfree, L, S, B)
     solution = eigen(H_magfield)
-    @assert norm(imag(solution.values)) < 1e-12    # energies need to be real
-    energies = real(solution.values) .- E0         # All energies relative to fieldfree GS energy
+    @assert isa(solution.values, Vector{Float64})  # energies need to be real
+    energies = solution.values .- E0         # All energies relative to fieldfree GS energy
     states = solution.vectors
     kB = 3.166811563e-6    # Boltzmann constant in Eh/K
     beta = 1/(kB*T)
@@ -521,5 +525,31 @@ function calc_free_energy(H_fieldfree::Matrix{ComplexF64}, L::NTuple{3, Matrix{C
     return -log(Z)/beta
 end
 
+function calc_magneticmoment_operator(L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}})
+    Mel = Vector{Matrix{ComplexF64}}(undef, 3)
+    for i in 1:3
+        Mel[i] = -0.5*L[i] - S[i]
+    end
+    return Mel
+end
+
+
+function calc_average_magneticmoment(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64}, T::Real)
+    E0 = fieldfree_GS_energy(H_fieldfree)
+    H_magfield = calc_H_magfield(H_fieldfree, L, S, B)
+    solution = eigen(H_magfield)
+    @assert isa(solution.values, Vector{Float64})  # energies need to be real
+    energies = solution.values .- E0         # All energies relative to fieldfree GS energy
+    states = solution.vectors
+    kB = 3.166811563e-6    # Boltzmann constant in Eh/K
+    beta = 1/(kB*T)
+    energies_exp = exp.(-beta*energies)
+    Z = sum(energies_exp)   # canonical partition function
+    Mel = calc_magneticmoment_operator(L,S)
+    Mel_eigenbasis = [states'*Melcomp*states for Melcomp in Mel]
+    Mel_avg = [-sum(energies_exp .* diag(Mel_eigenbasis_comp))/Z for Mel_eigenbasis_comp in Mel_eigenbasis]
+    @assert norm(imag(Mel_avg)) < 1e-12    # energies need to be real
+    return real(Mel_avg)
+end
 
 end
