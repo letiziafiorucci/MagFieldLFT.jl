@@ -354,6 +354,17 @@ function test_average_magnetic_moment2()
     return Mel_avg ≈ [0.0003645214756898332, 1.2322563787476262e-13, -1.4631881898029349]
 end
 
+function test_integrate_spherical()
+    Y_1_m1(theta,phi) = 0.5*sqrt(3/(2pi)) * exp(-im*phi)*sin(theta)
+    Y_1_0(theta,phi) = 0.5*sqrt(3/pi) * cos(theta)
+    grid = MagFieldLFT.spherical_product_grid(50,50)
+    # Results of integration: inner products [<Y_1_m1|Y_1_m1>, <Y_1_m1|Y_1_0>, <Y_1_0|Y_1_0>]
+    f(x,y) = [Y_1_m1(x,y)'*Y_1_m1(x,y), Y_1_m1(x,y)'*Y_1_0(x,y), Y_1_0(x,y)'*Y_1_0(x,y)]
+    integrals = MagFieldLFT.integrate_spherical(f, grid)
+    integrals = [round(x, digits=3) for x in integrals]
+    return integrals ≈ [1.000, 0.000, 1.000]
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
     @test test_createSDs2()
@@ -383,4 +394,5 @@ end
     @test test_calc_free_energy()
     @test test_average_magnetic_moment()
     @test test_average_magnetic_moment2()
+    @test test_integrate_spherical()
 end

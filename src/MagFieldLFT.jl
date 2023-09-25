@@ -533,7 +533,6 @@ function calc_magneticmoment_operator(L::NTuple{3, Matrix{ComplexF64}}, S::Tuple
     return Mel
 end
 
-
 function calc_average_magneticmoment(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64}, T::Real)
     E0 = fieldfree_GS_energy(H_fieldfree)
     H_magfield = calc_H_magfield(H_fieldfree, L, S, B)
@@ -551,5 +550,33 @@ function calc_average_magneticmoment(H_fieldfree::HermMat, L::NTuple{3, Matrix{C
     @assert norm(imag(Mel_avg)) < 1e-12    # energies need to be real
     return real(Mel_avg)
 end
+
+"""
+N_polar: Number of grid points for polar angle
+N_azimuthal: Number of grid points for azimuthal angle
+"""
+function spherical_product_grid(N_polar::Integer, N_azimuthal::Integer)
+    dtheta = pi/N_polar
+    dphi = 2pi/N_azimuthal
+    grid = Vector{Tuple{Float64, Float64, Float64}}(undef, 0)
+    for theta in (dtheta/2):dtheta:(pi-dtheta/2)
+        for phi in (dphi/2):dphi:(2pi-dphi/2)
+            weight = sin(theta)*dtheta*dphi
+            push!(grid, (theta, phi, weight))
+        end
+    end
+    return grid
+end
+
+function integrate_spherical(f::Function, grid::Vector{Tuple{Float64, Float64, Float64}})
+    dim = length(f(0,0))    # number of components in the output
+    integrals = zeros(dim)
+    for (theta, phi, weight) in grid
+        integrals += weight*f(theta, phi)
+    end
+    return integrals
+end
+
+
 
 end
