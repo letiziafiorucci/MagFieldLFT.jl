@@ -577,6 +577,20 @@ function integrate_spherical(f::Function, grid::Vector{Tuple{Float64, Float64, F
     return integrals
 end
 
+function dipole_matrix(R::Vector{T}) where T<:Real
+    R_length = norm(R)
+    idmat = Matrix(1.0I, 3, 3)
+    return ((3*R*R')/(R_length^2) - idmat)/(R_length^3)
+end
+
+"""
+Calculate magnetic field created by a magnetic dipole moment (everything in atomic units).
+"""
+function dipole_field(M::Vector{T1}, R::Vector{T2}) where {T1<:Real, T2<:Real}
+    alpha = 0.0072973525693  # fine structure constant
+    return alpha^2 * (dipole_matrix(R)*M)
+end
+
 
 
 end

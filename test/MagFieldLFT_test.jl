@@ -365,6 +365,23 @@ function test_integrate_spherical()
     return integrals ≈ [1.000, 0.000, 1.000]
 end
 
+function test_dipole_matrix()
+    R = [1,5,-2.0]
+    dipmat = MagFieldLFT.dipole_matrix(R)
+    ref = [-0.005477225575051661 0.003042903097250923 -0.0012171612389003691;
+    0.003042903097250923 0.009128709291752768 -0.006085806194501846;
+    -0.0012171612389003691 -0.006085806194501846 -0.0036514837167011074]
+    return dipmat ≈ ref
+end
+
+function test_dipole_field()
+    R = [5,7,9]
+    M = [-4.0, 3, 7.5]
+    B_dip = MagFieldLFT.dipole_field(M, R)
+    ref = [2.9330997775211083e-7, 1.7331548609510163e-7, 1.2230892547235214e-7]
+    return B_dip ≈ ref
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
     @test test_createSDs2()
@@ -395,4 +412,6 @@ end
     @test test_average_magnetic_moment()
     @test test_average_magnetic_moment2()
     @test test_integrate_spherical()
+    @test test_dipole_matrix()
+    @test test_dipole_field()
 end
