@@ -2,10 +2,18 @@ module MagFieldLFT
 
 using LinearAlgebra, Permutations, OutputParser
 
-export read_AILFT_params_ORCA
+export read_AILFT_params_ORCA, LFTParam
 
 const kB = 3.166811563e-6    # Boltzmann constant in Eh/K
 const alpha = 0.0072973525693  # fine structure constant
+
+struct LFTParam
+    nel::Int64
+    norb::Int64
+    hLFT::Matrix{Float64}
+    F::Dict{Int64, Float64}
+    zeta::Float64
+end
 
 function create_SDs(nel::Int, norb::Int)
     nspinorb = 2*norb
@@ -380,11 +388,11 @@ function calc_double_exc(ERIs::Array{Float64, 4}, L_alpha::Vector{Vector{NTuple{
     return H_double
 end
 
-function calc_H_nonrel(hLFT::Matrix{Float64}, F::Dict{Int64, Float64}, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}})
-    norb = size(hLFT)[1]
+function calc_H_nonrel(param::LFTParam, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}})
+    norb = size(param.hLFT)[1]
     l = (norb-1)÷2
-    ERIs = calcERIs_real(l, F)
-    h_mod = calc_hmod(hLFT, ERIs)
+    ERIs = calcERIs_real(l, param.F)
+    h_mod = calc_hmod(param.hLFT, ERIs)
     H_single = calc_singletop(h_mod, L_alpha, L_beta)
     H_double = calc_double_exc(ERIs, L_alpha, L_beta)
     return H_single + H_double
@@ -416,10 +424,10 @@ function calc_SOC(zeta::Float64, l::Int, L_alpha::Vector{Vector{NTuple{4, Int64}
     return H_SOC
 end
 
-function calc_H_fieldfree(hLFT::Matrix{Float64}, F::Dict{Int64, Float64}, zeta::Float64, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}}, L_plus::Vector{Vector{NTuple{4, Int64}}}, L_minus::Vector{Vector{NTuple{4, Int64}}})
-    norb = size(hLFT)[1]
+function calc_H_fieldfree(param::LFTParam, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}}, L_plus::Vector{Vector{NTuple{4, Int64}}}, L_minus::Vector{Vector{NTuple{4, Int64}}})
+    norb = size(param.hLFT)[1]
     l = (norb-1)÷2
-    H_fieldfree = calc_H_nonrel(hLFT, F, L_alpha, L_beta) + calc_SOC(zeta, l, L_alpha, L_beta, L_plus, L_minus)
+    H_fieldfree = calc_H_nonrel(param, L_alpha, L_beta) + calc_SOC(param.zeta, l, L_alpha, L_beta, L_plus, L_minus)
     return Hermitian(H_fieldfree)
 end
 
@@ -498,7 +506,7 @@ function read_AILFT_params_ORCA(outfile::String, method::String)
         F = Dict(0 => F0, 2 => F2/15/15, 4 => F4/33/33, 6 => (5/429)^2 * F6)
         zeta = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "ZETA_F"], 0, 2)/219474.63  # convert from cm-1 to Hartree
     end
-    return nel, norb, hLFT, F, zeta
+    return LFTParam(nel, norb, hLFT, F, zeta)
 end
 
 const HermMat = Hermitian{ComplexF64, Matrix{ComplexF64}}   # Complex hermitian matrix
@@ -546,7 +554,7 @@ function calc_solutions_magfield(H_fieldfree::HermMat, L::NTuple{3, Matrix{Compl
     return energies, states
 end
 
-function Zel(energies::Vector{Float64}, B0_mol::Vector{T1}, T::Real) where T1<:Real
+function calc_Zel(energies::Vector{Float64}, T::Real)
     beta = 1/(kB*T)
     energies_exp = exp.(-beta*energies)
     Z = sum(energies_exp)   # canonical partition function
@@ -579,6 +587,10 @@ function spherical_product_grid(N_polar::Integer, N_azimuthal::Integer)
     return grid
 end
 
+"""
+The function f is assumed to return a list of values (vector-valued).
+f is a function of points on the unit sphere, parametrized via a polar angle theta and an azimuthal angle phi.
+"""
 function integrate_spherical(f::Function, grid::Vector{Tuple{Float64, Float64, Float64}})
     dim = length(f(0,0))    # number of components in the output
     integrals = zeros(dim)
@@ -605,13 +617,54 @@ end
 B0: field strength (scalar quantity).
 The B0 vector in the laboratory frame is (0,0,B0)
 """
-function B0_mol(B0::Real, chi::Real, theta::Real)
+function calc_B0_mol(B0::Real, chi::Real, theta::Real)
     Bx = -sin(theta)*cos(chi)*B0
     By = sin(theta)*sin(chi)*B0
     Bz = cos(theta)*B0
     return [Bx, By, Bz]
 end
 
+function calc_Bind_avg_lab_z(chi::Real, theta::Real, Bind_avg_mol::Vector{Float64})
+    return -sin(theta)*cos(chi)*Bind_avg_mol[1] +
+            sin(theta)*sin(chi)*Bind_avg_mol[2] +
+            cos(theta)*         Bind_avg_mol[3]
+end
+
+"""
+theta: Euler angle: Angle between z axis (molecular frame) and Z axis (lab frame)
+chi: Euler angle describing rotations of the molecule around its molecular frame z axis
+H_fieldfree: Hamiltonian in the absence of a magnetic field (Slater determinant basis)
+L: Orbital angular momentum operators (Slater determinant basis)
+S: Total spin operators (Slater determinant basis)
+Mel: Electronic magnetic dipole moment operators (Slater determinant basis)
+R: Vectors from the points at which we want to know the induced field (typically nuclear positions) to the paramagnetic center (atomic units = Bohr)
+B0: Magnitude of the external magnetic field (atomic units)
+T: Temperature (Kelvin)
+"""
+function calc_integrands(theta::Real, chi::Real, H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, Mel::Vector{Matrix{ComplexF64}}, R::Vector{Vector{Float64}}, B0::Real, T::Real)
+    B0_mol = calc_B0_mol(B0, chi, theta)
+    energies, states = MagFieldLFT.calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
+    Zel = calc_Zel(energies, T)
+    Mel_avg_mol = calc_average_magneticmoment(energies, states, Mel, T)
+    Bind_avg_mol = [dipole_field(Mel_avg_mol, R_i) for R_i in R]
+    Bind_avg_lab_z = [calc_Bind_avg_lab_z(chi, theta, B_i) for B_i in Bind_avg_mol]
+    return [Zel*Bind_avg_lab_z; Zel]
+end
+
+"""
+R: Vectors from the points at which we want to know the induced field (typically nuclear positions) to the paramagnetic center (atomic units = Bohr)
+B0: Magnitude of the external magnetic field (atomic units)
+T: Temperature (Kelvin)
+"""
+function calc_Bind(param::LFTParam, R::Vector{Vector{Float64}}, B0::Real, T::Real, grid::Vector{Tuple{Float64, Float64, Float64}})
+    l=(param.norb-1)÷2
+    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,param.nel)
+    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, Lalpha, Lbeta, Lplus, Lminus)
+    S = MagFieldLFT.calc_S(l, Lalpha, Lbeta, Lplus, Lminus)
+    L = MagFieldLFT.calc_L(l, Lalpha, Lbeta)
+    integrands(theta, chi) = calc_integrands(theta, chi, H_fieldfree, L, S, Mel, R, B0, T)
+    integrals = integrate_spherical(integrands , grid)
+end
 
 
 
