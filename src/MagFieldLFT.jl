@@ -4,6 +4,9 @@ using LinearAlgebra, Permutations, OutputParser
 
 export read_AILFT_params_ORCA
 
+const kB = 3.166811563e-6    # Boltzmann constant in Eh/K
+const alpha = 0.0072973525693  # fine structure constant
+
 function create_SDs(nel::Int, norb::Int)
     nspinorb = 2*norb
     SDs = [[P] for P in 1:(nspinorb-nel+1)]
@@ -533,20 +536,28 @@ function calc_magneticmoment_operator(L::NTuple{3, Matrix{ComplexF64}}, S::Tuple
     return Mel
 end
 
-function calc_average_magneticmoment(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64}, T::Real)
+function calc_solutions_magfield(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B0_mol::Vector{Float64})
     E0 = fieldfree_GS_energy(H_fieldfree)
-    H_magfield = calc_H_magfield(H_fieldfree, L, S, B)
+    H_magfield = calc_H_magfield(H_fieldfree, L, S, B0_mol)
     solution = eigen(H_magfield)
     @assert isa(solution.values, Vector{Float64})  # energies need to be real
     energies = solution.values .- E0         # All energies relative to fieldfree GS energy
     states = solution.vectors
-    kB = 3.166811563e-6    # Boltzmann constant in Eh/K
+    return energies, states
+end
+
+function Zel(energies::Vector{Float64}, B0_mol::Vector{T1}, T::Real) where T1<:Real
     beta = 1/(kB*T)
     energies_exp = exp.(-beta*energies)
     Z = sum(energies_exp)   # canonical partition function
-    Mel = calc_magneticmoment_operator(L,S)
+end
+
+function calc_average_magneticmoment(energies::Vector{Float64}, states::Matrix{ComplexF64}, Mel::Vector{Matrix{ComplexF64}}, T::Real)
+    beta = 1/(kB*T)
+    energies_exp = exp.(-beta*energies)
+    Zel = sum(energies_exp)   # canonical partition function
     Mel_eigenbasis = [states'*Melcomp*states for Melcomp in Mel]
-    Mel_avg = [-sum(energies_exp .* diag(Mel_eigenbasis_comp))/Z for Mel_eigenbasis_comp in Mel_eigenbasis]
+    Mel_avg = [-sum(energies_exp .* diag(Mel_eigenbasis_comp))/Zel for Mel_eigenbasis_comp in Mel_eigenbasis]
     @assert norm(imag(Mel_avg)) < 1e-12    # energies need to be real
     return real(Mel_avg)
 end
@@ -587,9 +598,20 @@ end
 Calculate magnetic field created by a magnetic dipole moment (everything in atomic units).
 """
 function dipole_field(M::Vector{T1}, R::Vector{T2}) where {T1<:Real, T2<:Real}
-    alpha = 0.0072973525693  # fine structure constant
     return alpha^2 * (dipole_matrix(R)*M)
 end
+
+"""
+B0: field strength (scalar quantity).
+The B0 vector in the laboratory frame is (0,0,B0)
+"""
+function B0_mol(B0::Real, chi::Real, theta::Real)
+    Bx = -sin(theta)*cos(chi)*B0
+    By = sin(theta)*sin(chi)*B0
+    Bz = cos(theta)*B0
+    return [Bx, By, Bz]
+end
+
 
 
 

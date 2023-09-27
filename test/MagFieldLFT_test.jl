@@ -334,9 +334,11 @@ function test_average_magnetic_moment()
     H_fieldfree = MagFieldLFT.calc_H_fieldfree(hLFT, F, zeta, Lalpha, Lbeta, Lplus, Lminus)
     S = MagFieldLFT.calc_S(l, Lalpha, Lbeta, Lplus, Lminus)
     L = MagFieldLFT.calc_L(l, Lalpha, Lbeta)
-    B = [0.0, 0.0, 0.0]
+    B0_mol = [0.0, 0.0, 0.0]
     T = 298.0
-    Mel_avg = MagFieldLFT.calc_average_magneticmoment(H_fieldfree, L, S, B, T)
+    energies, states = MagFieldLFT.calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
+    Mel = MagFieldLFT.calc_magneticmoment_operator(L,S)
+    Mel_avg = MagFieldLFT.calc_average_magneticmoment(energies, states, Mel, T)
     return Mel_avg + [1.0, 1.0, 1.0] ≈ [1.0, 1.0, 1.0]    # magnetization is zero in absence of field
 end
 
@@ -348,9 +350,11 @@ function test_average_magnetic_moment2()
     H_fieldfree = MagFieldLFT.calc_H_fieldfree(hLFT, F, zeta, Lalpha, Lbeta, Lplus, Lminus)
     S = MagFieldLFT.calc_S(l, Lalpha, Lbeta, Lplus, Lminus)
     L = MagFieldLFT.calc_L(l, Lalpha, Lbeta)
-    B = [0.0, 0.0, 1.0e-4]
+    B0_mol = [0.0, 0.0, 1.0e-4]
     T = 1.0
-    Mel_avg = MagFieldLFT.calc_average_magneticmoment(H_fieldfree, L, S, B, T)
+    energies, states = MagFieldLFT.calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
+    Mel = MagFieldLFT.calc_magneticmoment_operator(L,S)
+    Mel_avg = MagFieldLFT.calc_average_magneticmoment(energies, states, Mel, T)
     return Mel_avg ≈ [0.0003645214756898332, 1.2322563787476262e-13, -1.4631881898029349]
 end
 
