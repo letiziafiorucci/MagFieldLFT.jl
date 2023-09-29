@@ -669,6 +669,27 @@ function calc_Bind(param::LFTParam, R::Vector{Vector{Float64}}, B0::Real, T::Rea
     return [N/D for N in numerators]
 end
 
+struct DegenerateSet
+    E::Float64
+    states::Vector{Int64}   # indices of states belonging to the set
+end
+
+function determine_degenerate_sets(energies::Vector{Float64})
+    degenerate_sets = Vector{DegenerateSet}(undef, 0)
+    current_energy = energies[1]
+    current_states = [1]
+    for i in 2:length(energies)
+        if abs(energies[i]-current_energy) < 1e-10                  # threshold is arbitrarily chosen. Need to think more about this
+            push!(current_states, i)
+        else
+            push!(degenerate_sets, DegenerateSet(current_energy, current_states))
+            current_energy = energies[i]
+            current_states = [i]
+        end
+    end
+    return degenerate_sets
+end
+
 
 
 end

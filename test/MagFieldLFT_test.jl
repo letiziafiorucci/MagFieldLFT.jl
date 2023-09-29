@@ -392,6 +392,19 @@ function test_dipole_field()
     return B_dip ≈ ref
 end
 
+function test_determine_degenerate_sets()
+    energies = [0.0, 1e-12, 1e-11, 2.2, 2.2+1e-11, 2.2+1e-9, 7, 9, 9, 9]
+    degenerate_sets = MagFieldLFT.determine_degenerate_sets(energies)
+    D = MagFieldLFT.DegenerateSet
+    ref = [D(0.0, [1,2,3]), D(2.2, [4,5]), D(2.2+1e-9, [6]), D(7.0, [7]), D(9.0, [8,9,10])]
+    passed = true
+    for i in 1:length(degenerate_sets)
+        passed = passed && (degenerate_sets[i].E == ref[i].E)
+        passed = passed && (degenerate_sets[i].states == ref[i].states)
+    end
+    return passed
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
     @test test_createSDs2()
@@ -424,4 +437,5 @@ end
     @test test_integrate_spherical()
     @test test_dipole_matrix()
     @test test_dipole_field()
+    @test test_determine_degenerate_sets()
 end
