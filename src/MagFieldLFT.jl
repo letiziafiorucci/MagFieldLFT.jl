@@ -489,7 +489,7 @@ function read_AILFT_params_ORCA(outfile::String, method::String)
                 hLFT[row,col] = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], row, col)
             end
         end
-        perm = [4,2,1,3,5]    # change order from 0,1,-1,2,-2 (=x2-y2,xz,z2,yz,xy) to 2,1,0,-1,-2
+        perm = [4,2,1,3,5]    # change order from 0,1,-1,2,-2 to 2,1,0,-1,-2 (=x2-y2,xz,z2,yz,xy) 
         hLFT = hLFT[perm, perm]
         F0 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 2, 4)
         F2 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 3, 2)
@@ -546,6 +546,10 @@ function calc_magneticmoment_operator(L::NTuple{3, Matrix{ComplexF64}}, S::Tuple
     return Mel
 end
 
+"""
+H_fieldfree: Hamiltonian in the absence of a magnetic field
+H: Hamiltonian whose eigenstates and eigenenergies we want to calculate (relative to fieldfree E0)
+"""
 function calc_solutions(H_fieldfree::HermMat, H::HermMat)
     E0 = fieldfree_GS_energy(H_fieldfree)
     solution = eigen(H)
@@ -554,6 +558,8 @@ function calc_solutions(H_fieldfree::HermMat, H::HermMat)
     states = solution.vectors
     return energies, states
 end
+
+calc_solutions(H_fieldfree::HermMat) = calc_solutions(H_fieldfree, H_fieldfree)
 
 function calc_solutions_magfield(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B0_mol::Vector{Float64})
     H_magfield = calc_H_magfield(H_fieldfree, L, S, B0_mol)
@@ -571,7 +577,7 @@ function calc_average_magneticmoment(energies::Vector{Float64}, states::Matrix{C
     energies_exp = exp.(-beta*energies)
     Zel = sum(energies_exp)   # canonical partition function
     Mel_eigenbasis = [states'*Melcomp*states for Melcomp in Mel]
-    Mel_avg = [-sum(energies_exp .* diag(Mel_eigenbasis_comp))/Zel for Mel_eigenbasis_comp in Mel_eigenbasis]
+    Mel_avg = [sum(energies_exp .* diag(Mel_eigenbasis_comp))/Zel for Mel_eigenbasis_comp in Mel_eigenbasis]
     @assert norm(imag(Mel_avg)) < 1e-12    # energies need to be real
     return real(Mel_avg)
 end
@@ -703,8 +709,40 @@ function determine_degenerate_sets(energies::Vector{Float64})
 end
 
 function calc_susceptibility_vanVleck(param::LFTParam, T::Real)
+    beta = 1/(kB*T)
     H_fieldfree, L, S, Mel = calc_operators_SDbasis(param)
-    return
+    energies, states = calc_solutions(H_fieldfree)
+    Zel0 = calc_Zel(energies, T)
+    Mel_eigenbasis = [states'*Melcomp*states for Melcomp in Mel]
+    degenerate_sets = determine_degenerate_sets(energies)
+    chi = im*zeros(3, 3)
+    for n in degenerate_sets
+        n_indices = n.states
+        m_indices = [i for i in 1:length(energies) if !(i in n_indices)]
+        Boltzmann_factor = exp(-beta*n.E)
+        Mel_part1 = [Melcomp[n_indices, n_indices] for Melcomp in Mel_eigenbasis]
+        Mel_part2 = [Melcomp[n_indices, m_indices] for Melcomp in Mel_eigenbasis]
+        Mel_eigenbasis_mod = deepcopy(Mel_eigenbasis)
+        for m in 1:length(energies)
+            for i in 1:3
+                Mel_eigenbasis_mod[i][:, m] /= (n.E - energies[m])
+            end
+        end
+        Mel_part2_mod = [Melcomp[n_indices, m_indices] for Melcomp in Mel_eigenbasis_mod]
+        for k in 1:3
+            for l in k:3
+                part1 = beta*tr(Mel_part1[k] * Mel_part1[l]')
+                part2 = -tr(Mel_part2[k] * Mel_part2_mod[l]')
+                chi[k, l] += Boltzmann_factor * (part1 + part2 + part2')
+                if k != l
+                    chi[l, k] += Boltzmann_factor * (part1 + part2 + part2')
+                end
+            end
+        end
+    end
+    chi *= (4pi*alpha^2)/Zel0
+    @assert norm(imag(chi)) < 1e-12
+    return real(chi)
 end
 
 

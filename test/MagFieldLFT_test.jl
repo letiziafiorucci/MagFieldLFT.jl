@@ -361,7 +361,27 @@ function test_average_magnetic_moment2()
     energies, states = MagFieldLFT.calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
     Mel = MagFieldLFT.calc_magneticmoment_operator(L,S)
     Mel_avg = MagFieldLFT.calc_average_magneticmoment(energies, states, Mel, T)
-    return Mel_avg ≈ [0.0003645214756898332, 1.2322563787476262e-13, -1.4631881898029349]
+    return Mel_avg ≈ [-0.0003645214756898332, -1.2322563787476262e-13, 1.4631881898029349]
+end
+
+# At low temperature, magnetization should be that of the ground state (approximately MS=-1/2,
+# having magnetization of <-1/2| Mz | -1/2> = - <-1/2|Sz|-1/2> = +1/2)
+function test_average_magnetic_moment3()
+    nel = 9
+    norb = 5
+    hLFT = diagm([0.3, 0.05, 0.0, 0.05, 0.1])   # energies of x2-y2, xz, z2, yz, xy
+    F = Dict(0 => 0.0, 2 => 0.0, 4 => 0.0)    # does not matter for d9 system
+    zeta = 0.0
+    param = MagFieldLFT.LFTParam(nel, norb, hLFT, F, zeta)
+
+    T = 0.0001
+    B0_mol = [0, 0, 1.0e-7]
+
+    H_fieldfree, L, S, Mel = MagFieldLFT.calc_operators_SDbasis(param)
+    energies, states = MagFieldLFT.calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
+    Mel_avg_finitefield = MagFieldLFT.calc_average_magneticmoment(energies, states, Mel, T)
+
+    return norm(Mel_avg_finitefield - [0.0, 0.0, 0.5]) < 1.0e-4
 end
 
 function test_integrate_spherical()
@@ -405,6 +425,24 @@ function test_determine_degenerate_sets()
     return passed
 end
 
+function test_calc_susceptibility_vanVleck()
+    param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
+    T = 298
+    B0_mol = [0, 0, 1.0e-7]
+
+    # version 1
+    chi = MagFieldLFT.calc_susceptibility_vanVleck(param, T)
+    Mel_avg_linear = (1/(4pi*MagFieldLFT.alpha^2))*chi*B0_mol
+
+    # version 2
+    H_fieldfree, L, S, Mel = MagFieldLFT.calc_operators_SDbasis(param)
+    energies, states = MagFieldLFT.calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
+    Mel_avg_finitefield = MagFieldLFT.calc_average_magneticmoment(energies, states, Mel, T)
+
+    return norm(Mel_avg_finitefield - Mel_avg_linear) < 1.0e-10
+end
+
+
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
     @test test_createSDs2()
@@ -434,8 +472,10 @@ end
     @test test_calc_free_energy()
     @test test_average_magnetic_moment()
     @test test_average_magnetic_moment2()
+    @test test_average_magnetic_moment3()
     @test test_integrate_spherical()
     @test test_dipole_matrix()
     @test test_dipole_field()
     @test test_determine_degenerate_sets()
+    @test test_calc_susceptibility_vanVleck()
 end
