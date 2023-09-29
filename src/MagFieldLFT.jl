@@ -321,6 +321,13 @@ function calc_hmod(hLFT::Matrix{Float64}, ERIs::Array{Float64, 4})
     return hmod
 end
 
+struct ExcitationLists
+    alpha::Vector{Vector{NTuple{4, Int64}}}
+    beta::Vector{Vector{NTuple{4, Int64}}}
+    plus::Vector{Vector{NTuple{4, Int64}}}
+    minus::Vector{Vector{NTuple{4, Int64}}}
+end
+
 """
 l: angular momentum of the partially filled shell (l=2 for d orbitals, l=3 for f orbitals).
 N: number of electrons in partially filled shell
@@ -345,42 +352,42 @@ function calc_exclists(l::Int, N::Int)
         push!(L_plus, exc_plus)
         push!(L_minus, exc_minus)
     end
-    return L_alpha, L_beta, L_plus, L_minus
+    return ExcitationLists(L_alpha, L_beta, L_plus, L_minus)
 end
 
-function calc_singletop(int::Matrix{T}, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}}) where T<:Number
-    Dim = length(L_alpha)
+function calc_singletop(int::Matrix{T}, exc::ExcitationLists) where T<:Number
+    Dim = length(exc.alpha)
     H_single = convert(T, 0) * zeros(Dim, Dim)   # zero matrix with same type as int
     for J in 1:Dim
-        for (Ii,pi,qi,gammai) in L_alpha[J]
+        for (Ii,pi,qi,gammai) in exc.alpha[J]
             H_single[Ii,J] += int[pi,qi]*gammai
         end
-        for (Ii,pi,qi,gammai) in L_beta[J]
+        for (Ii,pi,qi,gammai) in exc.beta[J]
             H_single[Ii,J] += int[pi,qi]*gammai
         end
     end
     return H_single
 end
 
-function calc_double_exc(ERIs::Array{Float64, 4}, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}})
-    Dim = length(L_alpha)
+function calc_double_exc(ERIs::Array{Float64, 4}, exc::ExcitationLists)
+    Dim = length(exc.alpha)
     norb = size(ERIs)[1]
     H_double = zeros(Dim, Dim)
     for K in 1:Dim
         X = zeros(Dim, norb, norb)
         for p in 1:norb, q in 1:norb
-            for (Ii,pi,qi,gammai) in L_alpha[K]
+            for (Ii,pi,qi,gammai) in exc.alpha[K]
                 X[Ii,p,q] += ERIs[p,q,qi,pi] * gammai
             end
-            for (Ii,pi,qi,gammai) in L_beta[K]
+            for (Ii,pi,qi,gammai) in exc.beta[K]
                 X[Ii,p,q] += ERIs[p,q,qi,pi] * gammai
             end
         end
         for J in 1:Dim
-            for (Ii,pi,qi,gammai) in L_alpha[K]
+            for (Ii,pi,qi,gammai) in exc.alpha[K]
                 H_double[Ii, J] += 0.5*gammai*X[J,pi,qi]
             end
-            for (Ii,pi,qi,gammai) in L_beta[K]
+            for (Ii,pi,qi,gammai) in exc.beta[K]
                 H_double[Ii, J] += 0.5*gammai*X[J,pi,qi]
             end
         end
@@ -388,79 +395,79 @@ function calc_double_exc(ERIs::Array{Float64, 4}, L_alpha::Vector{Vector{NTuple{
     return H_double
 end
 
-function calc_H_nonrel(param::LFTParam, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}})
+function calc_H_nonrel(param::LFTParam, exc::ExcitationLists)
     norb = size(param.hLFT)[1]
     l = (norb-1)÷2
     ERIs = calcERIs_real(l, param.F)
     h_mod = calc_hmod(param.hLFT, ERIs)
-    H_single = calc_singletop(h_mod, L_alpha, L_beta)
-    H_double = calc_double_exc(ERIs, L_alpha, L_beta)
+    H_single = calc_singletop(h_mod, exc)
+    H_double = calc_double_exc(ERIs, exc)
     return H_single + H_double
 end
 
 """
 zeta: SOC parameter
 l: angular momentum of partially filled shell
-L_alpha, L_beta, L_plus, L_minus: Lists of excitations and coupling coefficients.
+exc: Lists of excitations and coupling coefficients.
 """
-function calc_SOC(zeta::Float64, l::Int, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}}, L_plus::Vector{Vector{NTuple{4, Int64}}}, L_minus::Vector{Vector{NTuple{4, Int64}}})
-    Dim = length(L_alpha)
+function calc_SOC(zeta::Float64, l::Int, exc::ExcitationLists)
+    Dim = length(exc.alpha)
     H_SOC = im*zeros(Dim, Dim)
     lz, lplus, lminus = calc_lops_real(l::Int)
     for J in 1:Dim
-        for (Ii,pi,qi,gammai) in L_minus[J]
+        for (Ii,pi,qi,gammai) in exc.minus[J]
             H_SOC[Ii,J] += 0.5*zeta*lplus[pi,qi]*gammai
         end
-        for (Ii,pi,qi,gammai) in L_plus[J]
+        for (Ii,pi,qi,gammai) in exc.plus[J]
             H_SOC[Ii,J] += 0.5*zeta*lminus[pi,qi]*gammai
         end
-        for (Ii,pi,qi,gammai) in L_alpha[J]
+        for (Ii,pi,qi,gammai) in exc.alpha[J]
             H_SOC[Ii,J] += 0.5*zeta*lz[pi,qi]*gammai
         end
-        for (Ii,pi,qi,gammai) in L_beta[J]
+        for (Ii,pi,qi,gammai) in exc.beta[J]
             H_SOC[Ii,J] -= 0.5*zeta*lz[pi,qi]*gammai
         end
     end
     return H_SOC
 end
 
-function calc_H_fieldfree(param::LFTParam, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}}, L_plus::Vector{Vector{NTuple{4, Int64}}}, L_minus::Vector{Vector{NTuple{4, Int64}}})
+function calc_H_fieldfree(param::LFTParam, exc::ExcitationLists)
     norb = size(param.hLFT)[1]
     l = (norb-1)÷2
-    H_fieldfree = calc_H_nonrel(param, L_alpha, L_beta) + calc_SOC(param.zeta, l, L_alpha, L_beta, L_plus, L_minus)
+    H_fieldfree = calc_H_nonrel(param, exc) + calc_SOC(param.zeta, l, exc)
     return Hermitian(H_fieldfree)
 end
 
-function calc_L(l::Int, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}})
+function calc_L(l::Int, exc::ExcitationLists)
     lz, lplus, lminus = calc_lops_real(l::Int)
-    Lz = calc_singletop(lz, L_alpha, L_beta)
-    Lplus = calc_singletop(lplus, L_alpha, L_beta)
-    Lminus = calc_singletop(lminus, L_alpha, L_beta)
+    Lz = calc_singletop(lz, exc)
+    Lplus = calc_singletop(lplus, exc)
+    Lminus = calc_singletop(lminus, exc)
     Lx = (Lplus + Lminus)/2
     Ly = (Lplus - Lminus)/(2im)
     return Lx, Ly, Lz
 end
 
-function calc_S(l::Int, L_alpha::Vector{Vector{NTuple{4, Int64}}}, L_beta::Vector{Vector{NTuple{4, Int64}}}, L_plus::Vector{Vector{NTuple{4, Int64}}}, L_minus::Vector{Vector{NTuple{4, Int64}}})
+function calc_S(l::Int, exc::ExcitationLists)
     norb = 2l+1
     delta = Matrix{Float64}(1.0I, norb, norb)
-    Dim = length(L_alpha)
+    Dim = length(exc.alpha)
     Sx = zeros(Dim, Dim)
     Sy = im*zeros(Dim, Dim)
     Sz = zeros(Dim, Dim)
     for J in 1:Dim
-        for (Ii,pi,qi,gammai) in L_plus[J]
+        for (Ii,pi,qi,gammai) in exc.plus[J]
             Sx[Ii,J] += delta[pi,qi]*gammai/2
             Sy[Ii,J] += delta[pi,qi]*gammai/(2im)
         end
-        for (Ii,pi,qi,gammai) in L_minus[J]
+        for (Ii,pi,qi,gammai) in exc.minus[J]
             Sx[Ii,J] += delta[pi,qi]*gammai/2
             Sy[Ii,J] -= delta[pi,qi]*gammai/(2im)
         end
-        for (Ii,pi,qi,gammai) in L_alpha[J]
+        for (Ii,pi,qi,gammai) in exc.alpha[J]
             Sz[Ii,J] += delta[pi,qi]*gammai/2
         end
-        for (Ii,pi,qi,gammai) in L_beta[J]
+        for (Ii,pi,qi,gammai) in exc.beta[J]
             Sz[Ii,J] -= delta[pi,qi]*gammai/2
         end
     end
@@ -658,10 +665,11 @@ T: Temperature (Kelvin)
 """
 function calc_Bind(param::LFTParam, R::Vector{Vector{Float64}}, B0::Real, T::Real, grid::Vector{Tuple{Float64, Float64, Float64}})
     l=(param.norb-1)÷2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,param.nel)
-    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, Lalpha, Lbeta, Lplus, Lminus)
-    S = MagFieldLFT.calc_S(l, Lalpha, Lbeta, Lplus, Lminus)
-    L = MagFieldLFT.calc_L(l, Lalpha, Lbeta)
+    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
+    S = MagFieldLFT.calc_S(l, exc)
+    L = MagFieldLFT.calc_L(l, exc)
+    Mel = MagFieldLFT.calc_magneticmoment_operator(L,S)
     integrands(theta, chi) = calc_integrands(theta, chi, H_fieldfree, L, S, Mel, R, B0, T)
     integrals = integrate_spherical(integrands , grid)
     numerators = integrals[1:(end-1)]
@@ -670,8 +678,8 @@ function calc_Bind(param::LFTParam, R::Vector{Vector{Float64}}, B0::Real, T::Rea
 end
 
 struct DegenerateSet
-    E::Float64
-    states::Vector{Int64}   # indices of states belonging to the set
+    E::Float64              # energy of the states belonging to the set
+    states::Vector{Int64}   # indices of the states belonging to the set
 end
 
 function determine_degenerate_sets(energies::Vector{Float64})
@@ -688,6 +696,10 @@ function determine_degenerate_sets(energies::Vector{Float64})
         end
     end
     return degenerate_sets
+end
+
+function calc_susceptibility_vanVleck(T::Real)
+    return
 end
 
 

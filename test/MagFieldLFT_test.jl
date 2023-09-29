@@ -147,9 +147,9 @@ end
 function test_calc_exclists()
     l = 1
     N = 2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
-    test1 = Lalpha[1] == [(1,1,1,1), (6,2,1,-1), (8,3,1,-1)]
-    test2 = Lminus[10] == [(7,1,2,1), (14,3,2,-1)]
+    exc = MagFieldLFT.calc_exclists(l,N)
+    test1 = exc.alpha[1] == [(1,1,1,1), (6,2,1,-1), (8,3,1,-1)]
+    test2 = exc.minus[10] == [(7,1,2,1), (14,3,2,-1)]
     return test1 && test2
 end
 
@@ -163,12 +163,12 @@ E(1S) = F0 + 10*F2
 function test_calc_H_nonrel1()
     l=1
     N=2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
+    exc = MagFieldLFT.calc_exclists(l,N)
     norb = 2l+1
     hLFT = zeros(norb,norb)
     F = Dict(0 => 1.0, 2 => 2.0)
     param = LFTParam(N, norb, hLFT, F, 0.0)
-    H = MagFieldLFT.calc_H_nonrel(param, Lalpha, Lbeta)
+    H = MagFieldLFT.calc_H_nonrel(param, exc)
     E = eigvals(H)
     return E[1]≈-9 && E[9]≈-9 && E[10]≈3 && E[14]≈3 && E[15]≈21
 end
@@ -185,7 +185,7 @@ E(1S) = A + 14*B + 7*C
 function test_calc_H_nonrel2()
     l=2
     N=2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
+    exc = MagFieldLFT.calc_exclists(l,N)
     norb = 2l+1
     hLFT = zeros(norb,norb)
     A = 1
@@ -193,7 +193,7 @@ function test_calc_H_nonrel2()
     C = 4
     F = MagFieldLFT.Racah2F(A,B,C)
     param = LFTParam(N, norb, hLFT, F, 0.0)
-    H = MagFieldLFT.calc_H_nonrel(param, Lalpha, Lbeta)
+    H = MagFieldLFT.calc_H_nonrel(param, exc)
     E = eigvals(H)
     return E[1]≈-15 && E[22]≈3 && E[27]≈15 && E[36]≈17 && E[45]≈57
 end
@@ -201,7 +201,7 @@ end
 function test_calc_H_fieldfree()
     l=2
     N=2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
+    exc = MagFieldLFT.calc_exclists(l,N)
     norb = 2l+1
     hLFT = zeros(norb,norb)
     A = 1
@@ -210,7 +210,7 @@ function test_calc_H_fieldfree()
     F = MagFieldLFT.Racah2F(A,B,C)
     zeta = 0.5
     param = LFTParam(N, norb, hLFT, F, zeta)
-    H = MagFieldLFT.calc_H_fieldfree(param, Lalpha, Lbeta, Lplus, Lminus)
+    H = MagFieldLFT.calc_H_fieldfree(param, exc)
     E = eigvals(H)
     return E[1]≈E[5] && E[6]≈E[12] && E[13]≈E[21] && !(E[1]≈E[6]) && !(E[6]≈E[13])
 end
@@ -222,7 +222,7 @@ for the different terms.
 function test_calc_L()
     l=2
     N=2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
+    exc = MagFieldLFT.calc_exclists(l,N)
     norb = 2l+1
     hLFT = zeros(norb,norb)
     A = 1
@@ -230,9 +230,9 @@ function test_calc_L()
     C = 4
     F = MagFieldLFT.Racah2F(A,B,C)
     param = LFTParam(N, norb, hLFT, F, 0.0)
-    H = MagFieldLFT.calc_H_nonrel(param, Lalpha, Lbeta)
+    H = MagFieldLFT.calc_H_nonrel(param, exc)
     C = eigvecs(H)
-    Lx, Ly, Lz = MagFieldLFT.calc_L(l, Lalpha, Lbeta)
+    Lx, Ly, Lz = MagFieldLFT.calc_L(l, exc)
     L2 = Lx*Lx + Ly*Ly + Lz*Lz
     L2val = diag(C'*L2*C)
     return L2val[1]≈12 && L2val[22]≈6 && L2val[27]≈2 && L2val[36]≈20 && (L2val[45]+1)≈1
@@ -245,7 +245,7 @@ for the different terms.
 function test_calc_S()
     l=2
     N=2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
+    exc = MagFieldLFT.calc_exclists(l,N)
     norb = 2l+1
     hLFT = zeros(norb,norb)
     A = 1
@@ -253,9 +253,9 @@ function test_calc_S()
     C = 4
     F = MagFieldLFT.Racah2F(A,B,C)
     param = LFTParam(N, norb, hLFT, F, 0.0)
-    H = MagFieldLFT.calc_H_nonrel(param, Lalpha, Lbeta)
+    H = MagFieldLFT.calc_H_nonrel(param, exc)
     C = eigvecs(H)
-    Sx, Sy, Sz = MagFieldLFT.calc_S(l, Lalpha, Lbeta, Lplus, Lminus)
+    Sx, Sy, Sz = MagFieldLFT.calc_S(l, exc)
     S2 = Sx*Sx + Sy*Sy + Sz*Sz
     S2val = diag(C'*S2*C)
     return S2val[1]≈2 && (S2val[22]+1)≈1 && S2val[27]≈2 && (S2val[36]+1)≈1 && (S2val[45]+1)≈1
@@ -268,7 +268,7 @@ for the lowest three spin-orbit-coupled terms (originating from 3F term).
 function test_total_J()
     l=2
     N=2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,N)
+    exc = MagFieldLFT.calc_exclists(l,N)
     norb = 2l+1
     hLFT = zeros(norb,norb)
     A = 1
@@ -277,10 +277,10 @@ function test_total_J()
     F = MagFieldLFT.Racah2F(A,B,C)
     zeta = 0.5
     param = LFTParam(N, norb, hLFT, F, zeta)
-    H = MagFieldLFT.calc_H_fieldfree(param, Lalpha, Lbeta, Lplus, Lminus)
+    H = MagFieldLFT.calc_H_fieldfree(param, exc)
     C = eigvecs(H)
-    Lx, Ly, Lz = MagFieldLFT.calc_L(l, Lalpha, Lbeta)
-    Sx, Sy, Sz = MagFieldLFT.calc_S(l, Lalpha, Lbeta, Lplus, Lminus)
+    Lx, Ly, Lz = MagFieldLFT.calc_L(l, exc)
+    Sx, Sy, Sz = MagFieldLFT.calc_S(l, exc)
     Jx = Lx+Sx
     Jy = Ly+Sy
     Jz = Lz+Sz
@@ -292,8 +292,8 @@ end
 function test_read_AILFT_params_ORCA()
     param = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
     l=(param.norb-1)÷2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,param.nel)
-    H = MagFieldLFT.calc_H_nonrel(param, Lalpha, Lbeta)
+    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    H = MagFieldLFT.calc_H_nonrel(param, exc)
     E = eigvals(H)
     E = (E .- E[1])*27.211    # take ground state energy as reference and convert to eV
     println(round(E[5], digits=3))
@@ -310,8 +310,8 @@ end
 function test_Ercomplex_SOC()
     param = read_AILFT_params_ORCA("ErCl63-.out", "CASSCF")
     l=(param.norb-1)÷2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,param.nel)
-    H = MagFieldLFT.calc_H_fieldfree(param, Lalpha, Lbeta, Lplus, Lminus)
+    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    H = MagFieldLFT.calc_H_fieldfree(param, exc)
     E = eigvals(H)
     E = (E .- E[1])*219474.63  # take ground state energy as reference and convert to cm-1
     test1 = round(real(E[17]), digits=3) ==   5862.094
@@ -323,10 +323,10 @@ end
 function test_calc_free_energy()
     param = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
     l=(param.norb-1)÷2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,param.nel)
-    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, Lalpha, Lbeta, Lplus, Lminus)
-    S = MagFieldLFT.calc_S(l, Lalpha, Lbeta, Lplus, Lminus)
-    L = MagFieldLFT.calc_L(l, Lalpha, Lbeta)
+    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
+    S = MagFieldLFT.calc_S(l, exc)
+    L = MagFieldLFT.calc_L(l, exc)
     B = [0.0, 0.0, 1.0e-5]
     T = 298.0
     F1 = MagFieldLFT.calc_free_energy(H_fieldfree, L, S, B, T)
@@ -336,10 +336,10 @@ end
 function test_average_magnetic_moment()
     param = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
     l=(param.norb-1)÷2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,param.nel)
-    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, Lalpha, Lbeta, Lplus, Lminus)
-    S = MagFieldLFT.calc_S(l, Lalpha, Lbeta, Lplus, Lminus)
-    L = MagFieldLFT.calc_L(l, Lalpha, Lbeta)
+    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
+    S = MagFieldLFT.calc_S(l, exc)
+    L = MagFieldLFT.calc_L(l, exc)
     B0_mol = [0.0, 0.0, 0.0]
     T = 298.0
     energies, states = MagFieldLFT.calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
@@ -352,10 +352,10 @@ end
 function test_average_magnetic_moment2()
     param = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
     l=(param.norb-1)÷2
-    Lalpha, Lbeta, Lplus, Lminus = MagFieldLFT.calc_exclists(l,param.nel)
-    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, Lalpha, Lbeta, Lplus, Lminus)
-    S = MagFieldLFT.calc_S(l, Lalpha, Lbeta, Lplus, Lminus)
-    L = MagFieldLFT.calc_L(l, Lalpha, Lbeta)
+    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
+    S = MagFieldLFT.calc_S(l, exc)
+    L = MagFieldLFT.calc_L(l, exc)
     B0_mol = [0.0, 0.0, 1.0e-4]
     T = 1.0
     energies, states = MagFieldLFT.calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
