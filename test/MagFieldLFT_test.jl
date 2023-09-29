@@ -397,7 +397,7 @@ end
 
 function test_dipole_matrix()
     R = [1,5,-2.0]
-    dipmat = MagFieldLFT.dipole_matrix(R)
+    dipmat = MagFieldLFT.calc_dipole_matrix(R)
     ref = [-0.005477225575051661 0.003042903097250923 -0.0012171612389003691;
     0.003042903097250923 0.009128709291752768 -0.006085806194501846;
     -0.0012171612389003691 -0.006085806194501846 -0.0036514837167011074]
@@ -425,6 +425,7 @@ function test_determine_degenerate_sets()
     return passed
 end
 
+# in weak-field / high-temperature limit, finite-field magnetization should be linear in external field
 function test_calc_susceptibility_vanVleck()
     param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
     T = 298
@@ -440,6 +441,33 @@ function test_calc_susceptibility_vanVleck()
     Mel_avg_finitefield = MagFieldLFT.calc_average_magneticmoment(energies, states, Mel, T)
 
     return norm(Mel_avg_finitefield - Mel_avg_linear) < 1.0e-10
+end
+
+function test_KurlandMcGarvey()
+    bohrinangstrom = 0.529177210903
+    # atom counting starting from 1 (total number of atoms is 49, NH proton is the last one)
+    r_Ni = [0.000,   0.000,   0.000]                      # atom 33
+    r_NH = [0.511,  -2.518,  -0.002]                      # atom 49
+    r_CH1 = [1.053,   1.540,   3.541]                     # atom 23
+    r_CH2 = [-0.961,  -1.048,  -3.741]                    # atom 32
+    r_alpha1_alpha2prime_1 = [-1.500,  -3.452,   1.130]   # atom 44
+    r_alpha1_alpha2prime_2 = [0.430,  -3.104,   2.402]    # atom 45
+    R_NH                   = r_Ni - r_NH
+    R_CH1                  = r_Ni - r_CH1
+    R_CH2                  = r_Ni - r_CH2
+    R_alpha1_alpha2prime_1 = r_Ni - r_alpha1_alpha2prime_1
+    R_alpha1_alpha2prime_2 = r_Ni - r_alpha1_alpha2prime_2
+    R = [R_NH, R_CH1, R_CH2, R_alpha1_alpha2prime_1, R_alpha1_alpha2prime_2] / bohrinangstrom
+
+    param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
+    T = 298   # I actually did not find in the paper at which temperature they recorded it!?
+    shifts = MagFieldLFT.calc_shifts_KurlandMcGarvey(param, R, T)
+    ref = [-96.1951957001265, 30.53047905687625, 30.175351679457314, -22.804411834183288, -19.50459482031643]
+    # calculated PCS at CASSCF/NEVPT2/QDPT level according to SI of paper:
+    # [-61.5, 21.7, 21.3, -15.5, -13.6]
+    # My shifts are larger in magnitude by around 50%, but the relative size and sign is correct
+    # This could well be an artifact of only using CASSCF for determining the AILFT parameters (and/or of the LFT approximation)
+    return shifts ≈ ref
 end
 
 
@@ -478,4 +506,5 @@ end
     @test test_dipole_field()
     @test test_determine_degenerate_sets()
     @test test_calc_susceptibility_vanVleck()
+    @test test_KurlandMcGarvey()
 end

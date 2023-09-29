@@ -612,7 +612,7 @@ function integrate_spherical(f::Function, grid::Vector{Tuple{Float64, Float64, F
     return integrals
 end
 
-function dipole_matrix(R::Vector{T}) where T<:Real
+function calc_dipole_matrix(R::Vector{T}) where T<:Real
     R_length = norm(R)
     idmat = Matrix(1.0I, 3, 3)
     return ((3*R*R')/(R_length^2) - idmat)/(R_length^3)
@@ -622,7 +622,7 @@ end
 Calculate magnetic field created by a magnetic dipole moment (everything in atomic units).
 """
 function dipole_field(M::Vector{T1}, R::Vector{T2}) where {T1<:Real, T2<:Real}
-    return alpha^2 * (dipole_matrix(R)*M)
+    return alpha^2 * (calc_dipole_matrix(R)*M)
 end
 
 """
@@ -743,6 +743,24 @@ function calc_susceptibility_vanVleck(param::LFTParam, T::Real)
     chi *= (4pi*alpha^2)/Zel0
     @assert norm(imag(chi)) < 1e-12
     return real(chi)
+end
+
+"""
+Returns the chemical shifts in ppm calculated according to the Kurland-McGarvey equation (point-dipole approximation)
+R: Vectors from the points at which we want to know the induced field (typically nuclear positions) to the paramagnetic center (atomic units = Bohr)
+T: Temperature (Kelvin)
+"""
+function calc_shifts_KurlandMcGarvey(param::LFTParam, R::Vector{Vector{Float64}}, T::Real)
+    chi = calc_susceptibility_vanVleck(param, T)
+    shifts = Vector{Float64}(undef, 0)
+    for Ri in R
+        D = calc_dipole_matrix(Ri)
+        sigma = -(1/(4pi)) * chi * D
+        shift = -(1/3)*tr(sigma)
+        push!(shifts, shift)
+    end
+    shifts *= 1e6    # convert to ppm
+    return shifts
 end
 
 
