@@ -529,13 +529,8 @@ function fieldfree_GS_energy(H_fieldfree::HermMat)
     return energies[1]
 end
 
-function calc_free_energy(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64}, T::Real)
-    E0 = fieldfree_GS_energy(H_fieldfree)
-    H_magfield = calc_H_magfield(H_fieldfree, L, S, B)
-    solution = eigen(H_magfield)
-    @assert isa(solution.values, Vector{Float64})  # energies need to be real
-    energies = solution.values .- E0         # All energies relative to fieldfree GS energy
-    states = solution.vectors
+function calc_free_energy(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B0_mol::Vector{Float64}, T::Real)
+    energies, states = calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
     kB = 3.166811563e-6    # Boltzmann constant in Eh/K
     beta = 1/(kB*T)
     energies_exp = exp.(-beta*energies)
@@ -551,14 +546,18 @@ function calc_magneticmoment_operator(L::NTuple{3, Matrix{ComplexF64}}, S::Tuple
     return Mel
 end
 
-function calc_solutions_magfield(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B0_mol::Vector{Float64})
+function calc_solutions(H_fieldfree::HermMat, H::HermMat)
     E0 = fieldfree_GS_energy(H_fieldfree)
-    H_magfield = calc_H_magfield(H_fieldfree, L, S, B0_mol)
-    solution = eigen(H_magfield)
+    solution = eigen(H)
     @assert isa(solution.values, Vector{Float64})  # energies need to be real
     energies = solution.values .- E0         # All energies relative to fieldfree GS energy
     states = solution.vectors
     return energies, states
+end
+
+function calc_solutions_magfield(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B0_mol::Vector{Float64})
+    H_magfield = calc_H_magfield(H_fieldfree, L, S, B0_mol)
+    return calc_solutions(H_fieldfree, H_magfield)
 end
 
 function calc_Zel(energies::Vector{Float64}, T::Real)
@@ -658,18 +657,23 @@ function calc_integrands(theta::Real, chi::Real, H_fieldfree::HermMat, L::NTuple
     return [Zel*Bind_avg_lab_z; Zel]
 end
 
+function calc_operators_SDbasis(param::LFTParam)
+    l=(param.norb-1)÷2
+    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
+    L = MagFieldLFT.calc_L(l, exc)
+    S = MagFieldLFT.calc_S(l, exc)
+    Mel = MagFieldLFT.calc_magneticmoment_operator(L,S)
+    return H_fieldfree, L, S, Mel
+end
+
 """
 R: Vectors from the points at which we want to know the induced field (typically nuclear positions) to the paramagnetic center (atomic units = Bohr)
 B0: Magnitude of the external magnetic field (atomic units)
 T: Temperature (Kelvin)
 """
 function calc_Bind(param::LFTParam, R::Vector{Vector{Float64}}, B0::Real, T::Real, grid::Vector{Tuple{Float64, Float64, Float64}})
-    l=(param.norb-1)÷2
-    exc = MagFieldLFT.calc_exclists(l,param.nel)
-    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
-    S = MagFieldLFT.calc_S(l, exc)
-    L = MagFieldLFT.calc_L(l, exc)
-    Mel = MagFieldLFT.calc_magneticmoment_operator(L,S)
+    H_fieldfree, L, S, Mel = calc_operators_SDbasis(param)
     integrands(theta, chi) = calc_integrands(theta, chi, H_fieldfree, L, S, Mel, R, B0, T)
     integrals = integrate_spherical(integrands , grid)
     numerators = integrals[1:(end-1)]
@@ -698,7 +702,8 @@ function determine_degenerate_sets(energies::Vector{Float64})
     return degenerate_sets
 end
 
-function calc_susceptibility_vanVleck(T::Real)
+function calc_susceptibility_vanVleck(param::LFTParam, T::Real)
+    H_fieldfree, L, S, Mel = calc_operators_SDbasis(param)
     return
 end
 
