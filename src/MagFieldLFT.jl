@@ -664,6 +664,9 @@ function calc_Bind(param::LFTParam, R::Vector{Vector{Float64}}, B0::Real, T::Rea
     L = MagFieldLFT.calc_L(l, Lalpha, Lbeta)
     integrands(theta, chi) = calc_integrands(theta, chi, H_fieldfree, L, S, Mel, R, B0, T)
     integrals = integrate_spherical(integrands , grid)
+    numerators = integrals[1:(end-1)]
+    D = integrals[end]   # denominator (normalization)
+    return [N/D for N in numerators]
 end
 
 
