@@ -470,6 +470,31 @@ function test_KurlandMcGarvey()
     return shifts ≈ ref
 end
 
+function test_KurlandMcGarvey_vs_finitefield()
+    bohrinangstrom = 0.529177210903
+    # atom counting starting from 1 (total number of atoms is 49, NH proton is the last one)
+    r_Ni = [0.000,   0.000,   0.000]                      # atom 33
+    r_NH = [0.511,  -2.518,  -0.002]                      # atom 49
+    r_CH1 = [1.053,   1.540,   3.541]                     # atom 23
+    r_CH2 = [-0.961,  -1.048,  -3.741]                    # atom 32
+    r_alpha1_alpha2prime_1 = [-1.500,  -3.452,   1.130]   # atom 44
+    r_alpha1_alpha2prime_2 = [0.430,  -3.104,   2.402]    # atom 45
+    R_NH                   = r_Ni - r_NH
+    R_CH1                  = r_Ni - r_CH1
+    R_CH2                  = r_Ni - r_CH2
+    R_alpha1_alpha2prime_1 = r_Ni - r_alpha1_alpha2prime_1
+    R_alpha1_alpha2prime_2 = r_Ni - r_alpha1_alpha2prime_2
+    R = [R_NH, R_CH1, R_CH2, R_alpha1_alpha2prime_1, R_alpha1_alpha2prime_2] / bohrinangstrom
+
+    param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
+    T = 298   # I actually did not find in the paper at which temperature they recorded it!?
+    KMcG_shifts = MagFieldLFT.calc_shifts_KurlandMcGarvey(param, R, T)
+    grid = MagFieldLFT.spherical_product_grid(100,100)
+    B0 = 1.0e-6
+    finitefield_shifts = MagFieldLFT.estimate_shifts_finitefield(param, R, B0, T, grid)
+    return norm(KMcG_shifts - finitefield_shifts) < 0.1
+end
+
 
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
@@ -507,4 +532,5 @@ end
     @test test_determine_degenerate_sets()
     @test test_calc_susceptibility_vanVleck()
     @test test_KurlandMcGarvey()
+    @test test_KurlandMcGarvey_vs_finitefield()
 end

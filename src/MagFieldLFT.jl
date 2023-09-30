@@ -687,6 +687,11 @@ function calc_Bind(param::LFTParam, R::Vector{Vector{Float64}}, B0::Real, T::Rea
     return [N/D for N in numerators]
 end
 
+function estimate_shifts_finitefield(param::LFTParam, R::Vector{Vector{Float64}}, B0::Real, T::Real, grid::Vector{Tuple{Float64, Float64, Float64}})
+    Bind_values = calc_Bind(param, R, B0, T, grid)
+    return (Bind_values / B0) * 1e6    # convert to ppm
+end
+
 struct DegenerateSet
     E::Float64              # energy of the states belonging to the set
     states::Vector{Int64}   # indices of the states belonging to the set
