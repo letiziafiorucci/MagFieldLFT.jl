@@ -1,11 +1,36 @@
 module MagFieldLFT
 
-using LinearAlgebra, Permutations, OutputParser
+using LinearAlgebra, Permutations, OutputParser, DelimitedFiles
 
-export read_AILFT_params_ORCA, LFTParam
+export read_AILFT_params_ORCA, LFTParam, lebedev_grids
 
 const kB = 3.166811563e-6    # Boltzmann constant in Eh/K
 const alpha = 0.0072973525693  # fine structure constant
+
+function xyz2spher(x::Real, y::Real, z::Real)
+    theta = acos(z)
+    phi = atan(y,x)   # 2-argument atan (also known as atan2)
+    return theta, phi
+end
+
+function setup_Lebedev_grids()
+    pkgpath = dirname(pathof(MagFieldLFT))
+    gridsizes = [6, 14, 26, 38, 50, 74, 86, 110, 146, 170, 194, 230, 266, 302, 350, 434, 590, 770, 974, 1202, 1454, 1730, 2030, 2354, 2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810]
+    lebedev_grids = Vector{Vector{Tuple{Float64, Float64, Float64}}}(undef, 0)
+    for N in gridsizes
+        xyzgrid = readdlm("$pkgpath/grids/grid_$N")
+        grid = Vector{Tuple{Float64, Float64, Float64}}(undef, 0)
+        for i in 1:(size(xyzgrid)[1])
+            theta, phi = xyz2spher(xyzgrid[i,1], xyzgrid[i,2], xyzgrid[i,3])
+            weight = 4pi * xyzgrid[i,4]
+            push!(grid, (theta, phi, weight))
+        end
+        push!(lebedev_grids, grid)
+    end
+    return lebedev_grids
+end
+
+lebedev_grids = setup_Lebedev_grids()
 
 struct LFTParam
     nel::Int64
