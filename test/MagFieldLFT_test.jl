@@ -411,6 +411,17 @@ function test_integrate_spherical()
     return integrals ≈ [1.000, 0.000, 1.000]
 end
 
+function test_integrate_spherical_Lebedev()
+    Y_1_m1(theta,phi) = 0.5*sqrt(3/(2pi)) * exp(-im*phi)*sin(theta)
+    Y_1_0(theta,phi) = 0.5*sqrt(3/pi) * cos(theta)
+    grid = lebedev_grids[25]
+    # Results of integration: inner products [<Y_1_m1|Y_1_m1>, <Y_1_m1|Y_1_0>, <Y_1_0|Y_1_0>]
+    f(x,y) = [Y_1_m1(x,y)'*Y_1_m1(x,y), Y_1_m1(x,y)'*Y_1_0(x,y), Y_1_0(x,y)'*Y_1_0(x,y)]
+    integrals = MagFieldLFT.integrate_spherical(f, grid)
+    integrals = [round(x, digits=10) for x in integrals]
+    return integrals ≈ [1.000, 0.000, 1.000]
+end
+
 function test_dipole_matrix()
     R = [1,5,-2.0]
     dipmat = MagFieldLFT.calc_dipole_matrix(R)
@@ -511,6 +522,31 @@ function test_KurlandMcGarvey_vs_finitefield()
     return norm(KMcG_shifts - finitefield_shifts) < 0.1
 end
 
+function test_KurlandMcGarvey_vs_finitefield_Lebedev()
+    bohrinangstrom = 0.529177210903
+    # atom counting starting from 1 (total number of atoms is 49, NH proton is the last one)
+    r_Ni = [0.000,   0.000,   0.000]                      # atom 33
+    r_NH = [0.511,  -2.518,  -0.002]                      # atom 49
+    r_CH1 = [1.053,   1.540,   3.541]                     # atom 23
+    r_CH2 = [-0.961,  -1.048,  -3.741]                    # atom 32
+    r_alpha1_alpha2prime_1 = [-1.500,  -3.452,   1.130]   # atom 44
+    r_alpha1_alpha2prime_2 = [0.430,  -3.104,   2.402]    # atom 45
+    R_NH                   = r_Ni - r_NH
+    R_CH1                  = r_Ni - r_CH1
+    R_CH2                  = r_Ni - r_CH2
+    R_alpha1_alpha2prime_1 = r_Ni - r_alpha1_alpha2prime_1
+    R_alpha1_alpha2prime_2 = r_Ni - r_alpha1_alpha2prime_2
+    R = [R_NH, R_CH1, R_CH2, R_alpha1_alpha2prime_1, R_alpha1_alpha2prime_2] / bohrinangstrom
+
+    param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
+    T = 298   # I actually did not find in the paper at which temperature they recorded it!?
+    KMcG_shifts = MagFieldLFT.calc_shifts_KurlandMcGarvey(param, R, T)
+    grid = lebedev_grids[20]
+    B0 = 1.0e-7
+    finitefield_shifts = MagFieldLFT.estimate_shifts_finitefield(param, R, B0, T, grid)
+    return norm(KMcG_shifts - finitefield_shifts) < 1.0e-6
+end
+
 
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
@@ -544,10 +580,12 @@ end
     @test test_average_magnetic_moment2()
     @test test_average_magnetic_moment3()
     @test test_integrate_spherical()
+    @test test_integrate_spherical_Lebedev()
     @test test_dipole_matrix()
     @test test_dipole_field()
     @test test_determine_degenerate_sets()
     @test test_calc_susceptibility_vanVleck()
     @test test_KurlandMcGarvey()
     @test test_KurlandMcGarvey_vs_finitefield()
+    @test test_KurlandMcGarvey_vs_finitefield_Lebedev()
 end
