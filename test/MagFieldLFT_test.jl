@@ -307,6 +307,22 @@ function test_read_AILFT_params_ORCA()
     return test1 && test2 && test3 && test4
 end
 
+# because of precision issues in the printed LFT parameters, the energies do not coincide exactly
+# with what is printed in the ORCA output file!
+# TO DO: change later.
+function test_Ercomplex()
+    param = read_AILFT_params_ORCA("ErCl63-.out", "CASSCF")
+    l=(param.norb-1)÷2
+    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    H = MagFieldLFT.calc_H_nonrel(param, exc)
+    E = eigvals(H)
+    E = (E .- E[1])*27.211  # take ground state energy as reference and convert to eV
+    test1 = round(real(E[29]), digits=3) == 0.020
+    test2 = round(real(E[53]), digits=3) == 2.194
+    test3 = round(real(E[75]), digits=3) == 2.238
+    return test1 && test2 && test3
+end
+
 function test_Ercomplex_SOC()
     param = read_AILFT_params_ORCA("ErCl63-.out", "CASSCF")
     l=(param.norb-1)÷2
@@ -522,6 +538,7 @@ end
     @test test_total_J()
     @test_broken test_read_AILFT_params_ORCA()
     @test test_Ercomplex_SOC()
+    @test test_Ercomplex()
     @test test_calc_free_energy()
     @test test_average_magnetic_moment()
     @test test_average_magnetic_moment2()
