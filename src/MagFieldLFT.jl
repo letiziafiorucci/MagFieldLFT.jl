@@ -756,41 +756,48 @@ function determine_degenerate_sets(energies::Vector{Float64})
     return degenerate_sets
 end
 
-function calc_susceptibility_vanVleck(param::LFTParam, T::Real)
+function calc_Fderiv2(param::LFTParam, T::Real, B0_mol::Vector{Float64})
     beta = 1/(kB*T)
     H_fieldfree, L, S, Mel = calc_operators_SDbasis(param)
-    energies, states = calc_solutions(H_fieldfree)
-    Zel0 = calc_Zel(energies, T)
-    Mel_eigenbasis = [states'*Melcomp*states for Melcomp in Mel]
+    Hderiv = -Mel
+    energies, states = calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
+    Zel = calc_Zel(energies, T)
+    Hderiv_eigenbasis = [states'*Hderivcomp*states for Hderivcomp in Hderiv]
     degenerate_sets = determine_degenerate_sets(energies)
-    chi = im*zeros(3, 3)
-    for n in degenerate_sets
-        n_indices = n.states
-        m_indices = [i for i in 1:length(energies) if !(i in n_indices)]
-        Boltzmann_factor = exp(-beta*n.E)
-        Mel_part1 = [Melcomp[n_indices, n_indices] for Melcomp in Mel_eigenbasis]
-        Mel_part2 = [Melcomp[n_indices, m_indices] for Melcomp in Mel_eigenbasis]
-        Mel_eigenbasis_mod = deepcopy(Mel_eigenbasis)
-        for m in 1:length(energies)
+    Fderiv2 = im*zeros(3, 3)
+    for M in degenerate_sets
+        M_indices = M.states
+        N_indices = [i for i in 1:length(energies) if !(i in M_indices)]
+        Boltzmann_factor = exp(-beta*M.E)
+        Hderiv_part1 = [Hderivcomp[M_indices, M_indices] for Hderivcomp in Hderiv_eigenbasis]
+        Hderiv_part2 = [Hderivcomp[M_indices, N_indices] for Hderivcomp in Hderiv_eigenbasis]
+        Hderiv_eigenbasis_mod = deepcopy(Hderiv_eigenbasis)
+        for n in 1:length(energies)
             for i in 1:3
-                Mel_eigenbasis_mod[i][:, m] /= (n.E - energies[m])
+                Hderiv_eigenbasis_mod[i][:, n] /= (energies[n] - M.E)
             end
         end
-        Mel_part2_mod = [Melcomp[n_indices, m_indices] for Melcomp in Mel_eigenbasis_mod]
+        Hderiv_part2_mod = [Hderivcomp[M_indices, N_indices] for Hderivcomp in Hderiv_eigenbasis_mod]
         for k in 1:3
-            for l in k:3
-                part1 = beta*tr(Mel_part1[k] * Mel_part1[l]')
-                part2 = -tr(Mel_part2[k] * Mel_part2_mod[l]')
-                chi[k, l] += Boltzmann_factor * (part1 + part2 + part2')
-                if k != l
-                    chi[l, k] += Boltzmann_factor * (part1 + part2 + part2')
-                end
+            for l in 1:3
+                part1 = 0.5*beta*tr(Hderiv_part1[k] * Hderiv_part1[l]')
+                part2 = tr(Hderiv_part2[k] * Hderiv_part2_mod[l]')
+                Fderiv2[k, l] += Boltzmann_factor * (part1 + part2)
             end
         end
     end
-    chi *= (4pi*alpha^2)/Zel0
-    @assert norm(imag(chi)) < 1e-12
-    return real(chi)
+    Fderiv2 *= -1/Zel
+    Fderiv1 = calc_F_deriv1(energies, states, Hderiv, T)
+    Fderiv2 += 0.5*beta* Fderiv1*Fderiv1'
+    Fderiv2 += Fderiv2'  # symmetrization
+    @assert norm(imag(Fderiv2)) < 1e-5
+    return real(Fderiv2)
+end
+
+function calc_susceptibility_vanVleck(param::LFTParam, T::Real)
+    B = [0.0, 0.0, 0.0]
+    Fderiv2 = calc_Fderiv2(param, T, B)
+    return -4pi*alpha^2 * Fderiv2
 end
 
 """
