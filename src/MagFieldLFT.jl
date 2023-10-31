@@ -793,6 +793,25 @@ function calc_shifts_KurlandMcGarvey(param::LFTParam, R::Vector{Vector{Float64}}
     return shifts
 end
 
+function Tesla2au(B::Real)
+    return B/2.35051756758e5
+end
+
+"""
+nu: Resonance frequency in MHz
+"""
+function MHz2Tesla(nu::Real)
+    gamma = 42.577478518     # gyromagnetic ratio of the proton in MHz/T
+    return nu/gamma
+end
+
+"""
+nu: Resonance frequency in MHz
+"""
+function MHz2au(nu::Real)
+    return Tesla2au(MHz2Tesla(nu))
+end
+
 
 
 end
