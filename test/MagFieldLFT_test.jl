@@ -359,8 +359,9 @@ function test_average_magnetic_moment()
     B0_mol = [0.0, 0.0, 0.0]
     T = 298.0
     energies, states = MagFieldLFT.calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
-    Mel = MagFieldLFT.calc_magneticmoment_operator(L,S)
-    Mel_avg = MagFieldLFT.calc_average_magneticmoment(energies, states, Mel, T)
+    Hderiv = MagFieldLFT.calc_Hderiv(L,S)
+    Fderiv1 = MagFieldLFT.calc_F_deriv1(energies, states, Hderiv, T)
+    Mel_avg = -Fderiv1
     return Mel_avg + [1.0, 1.0, 1.0] ≈ [1.0, 1.0, 1.0]    # magnetization is zero in absence of field
 end
 

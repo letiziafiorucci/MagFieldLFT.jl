@@ -571,6 +571,14 @@ function calc_magneticmoment_operator(L::NTuple{3, Matrix{ComplexF64}}, S::Tuple
     return Mel
 end
 
+function calc_Hderiv(L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}})
+    Hderiv = Vector{Matrix{ComplexF64}}(undef, 3)
+    for i in 1:3
+        Hderiv[i] = 0.5*L[i] - S[i]
+    end
+    return Hderiv
+end
+
 """
 H_fieldfree: Hamiltonian in the absence of a magnetic field
 H: Hamiltonian whose eigenstates and eigenenergies we want to calculate (relative to fieldfree E0)
@@ -605,6 +613,16 @@ function calc_average_magneticmoment(energies::Vector{Float64}, states::Matrix{C
     Mel_avg = [sum(energies_exp .* diag(Mel_eigenbasis_comp))/Zel for Mel_eigenbasis_comp in Mel_eigenbasis]
     @assert norm(imag(Mel_avg)) < 1e-12    # energies need to be real
     return real(Mel_avg)
+end
+
+function calc_F_deriv1(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hderiv::Vector{Matrix{ComplexF64}}, T::Real)
+    beta = 1/(kB*T)
+    energies_exp = exp.(-beta*energies)
+    Zel = sum(energies_exp)   # canonical partition function
+    Hderiv_eigenbasis = [states'*Hderiv_comp*states for Hderiv_comp in Hderiv]
+    Fderiv1 = [sum(energies_exp .* diag(Hderiv_eigenbasis_comp))/Zel for Hderiv_eigenbasis_comp in Hderiv_eigenbasis]
+    @assert norm(imag(Fderiv1)) < 1e-12    # need to be real
+    return real(Fderiv1)
 end
 
 """
