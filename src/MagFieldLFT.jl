@@ -756,6 +756,18 @@ function determine_degenerate_sets(energies::Vector{Float64})
     return degenerate_sets
 end
 
+function calc_N_indices(number_indices::Real, M_indices::Vector{Int64})
+    return [i for i in 1:number_indices if !(i in M_indices)]
+end
+
+function calc_Hderiv_part(Hderiv_eigenbasis::Vector{Matrix{ComplexF64}}, I_indices::Vector{Int64}, J_indices::Vector{Int64})
+    return [Hderivcomp[I_indices, J_indices] for Hderivcomp in Hderiv_eigenbasis]
+end
+
+function calc_Hderiv_eigenbasis_denom()
+    return
+end
+
 function calc_F_deriv2(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hderiv::Vector{Matrix{ComplexF64}}, T::Real)
     beta = 1/(kB*T)
     Zel = calc_Zel(energies, T)
@@ -764,17 +776,17 @@ function calc_F_deriv2(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hd
     Fderiv2 = im*zeros(3, 3)
     for M in degenerate_sets
         M_indices = M.states
-        N_indices = [i for i in 1:length(energies) if !(i in M_indices)]
+        N_indices = calc_N_indices(length(energies), M_indices)
         Boltzmann_factor = exp(-beta*M.E)
-        Hderiv_MM = [Hderivcomp[M_indices, M_indices] for Hderivcomp in Hderiv_eigenbasis]
-        Hderiv_MN = [Hderivcomp[M_indices, N_indices] for Hderivcomp in Hderiv_eigenbasis]
-        Hderiv_eigenbasis_mod = deepcopy(Hderiv_eigenbasis)
+        Hderiv_MM = calc_Hderiv_part(Hderiv_eigenbasis, M_indices, M_indices)
+        Hderiv_MN = calc_Hderiv_part(Hderiv_eigenbasis, M_indices, N_indices)
+        Hderiv_eigenbasis_denom = deepcopy(Hderiv_eigenbasis)
         for n in 1:length(energies)
             for i in 1:3
-                Hderiv_eigenbasis_mod[i][:, n] /= (energies[n] - M.E)
+                Hderiv_eigenbasis_denom[i][:, n] /= (energies[n] - M.E)
             end
         end
-        Hderiv_MN_denom = [Hderivcomp[M_indices, N_indices] for Hderivcomp in Hderiv_eigenbasis_mod]
+        Hderiv_MN_denom = calc_Hderiv_part(Hderiv_eigenbasis_denom, M_indices, N_indices)
         for k in 1:3
             for l in 1:3
                 part1 = 0.5*beta*tr(Hderiv_MM[k] * Hderiv_MM[l]')
@@ -789,6 +801,43 @@ function calc_F_deriv2(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hd
     Fderiv2 += transpose(Fderiv2)  # symmetrization
     @assert norm(imag(Fderiv2)) < 1e-5
     return real(Fderiv2)
+end
+
+function calc_F_deriv3(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hderiv::Vector{Matrix{ComplexF64}}, T::Real)
+    beta = 1/(kB*T)
+    Zel = calc_Zel(energies, T)
+    Hderiv_eigenbasis = [states'*Hderivcomp*states for Hderivcomp in Hderiv]
+    degenerate_sets = determine_degenerate_sets(energies)
+    Fderiv3 = im*zeros(3, 3)
+    for M in degenerate_sets
+        M_indices = M.states
+        N_indices = [i for i in 1:length(energies) if !(i in M_indices)]
+        Boltzmann_factor = exp(-beta*M.E)
+        Hderiv_MM = [Hderivcomp[M_indices, M_indices] for Hderivcomp in Hderiv_eigenbasis]
+        Hderiv_MN = [Hderivcomp[M_indices, N_indices] for Hderivcomp in Hderiv_eigenbasis]
+        Hderiv_eigenbasis_denom = deepcopy(Hderiv_eigenbasis)
+        for n in 1:length(energies)
+            for i in 1:3
+                Hderiv_eigenbasis_denom[i][:, n] /= (energies[n] - M.E)
+            end
+        end
+        Hderiv_MN_denom = [Hderivcomp[M_indices, N_indices] for Hderivcomp in Hderiv_eigenbasis_denom]
+        for l in 1:3
+            for k in 1:3
+                for j in 1:3
+                    part1 = 0.5*beta*tr(Hderiv_MM[k] * Hderiv_MM[l]')
+                    part2 = tr(Hderiv_MN[k] * Hderiv_MN_denom[l]')
+                    Fderiv3[k, l] += Boltzmann_factor * (part1 + part2)
+                end
+            end
+        end
+    end
+    #Fderiv3 *= -1/Zel
+    Fderiv1 = calc_F_deriv1(energies, states, Hderiv, T)
+    #Fderiv2 += 0.5*beta* Fderiv1*Fderiv1'
+    #Fderiv2 += transpose(Fderiv2)  # symmetrization
+    @assert norm(imag(Fderiv3)) < 1e-5
+    return real(Fderiv3)
 end
 
 function F_deriv_param2states(calc_F_derivx::Function)
