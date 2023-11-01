@@ -764,8 +764,14 @@ function calc_Hderiv_part(Hderiv_eigenbasis::Vector{Matrix{ComplexF64}}, I_indic
     return [Hderivcomp[I_indices, J_indices] for Hderivcomp in Hderiv_eigenbasis]
 end
 
-function calc_Hderiv_eigenbasis_denom()
-    return
+function calc_Hderiv_eigenbasis_denom(Hderiv_eigenbasis::Vector{Matrix{ComplexF64}}, denoms)
+    Hderiv_eigenbasis_denom = deepcopy(Hderiv_eigenbasis)
+    for n in 1:length(denoms)
+        for i in 1:3
+            Hderiv_eigenbasis_denom[i][:, n] /= denoms[n]
+        end
+    end
+    return Hderiv_eigenbasis_denom
 end
 
 function calc_F_deriv2(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hderiv::Vector{Matrix{ComplexF64}}, T::Real)
@@ -780,12 +786,7 @@ function calc_F_deriv2(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hd
         Boltzmann_factor = exp(-beta*M.E)
         Hderiv_MM = calc_Hderiv_part(Hderiv_eigenbasis, M_indices, M_indices)
         Hderiv_MN = calc_Hderiv_part(Hderiv_eigenbasis, M_indices, N_indices)
-        Hderiv_eigenbasis_denom = deepcopy(Hderiv_eigenbasis)
-        for n in 1:length(energies)
-            for i in 1:3
-                Hderiv_eigenbasis_denom[i][:, n] /= (energies[n] - M.E)
-            end
-        end
+        Hderiv_eigenbasis_denom = calc_Hderiv_eigenbasis_denom(Hderiv_eigenbasis, energies .- M.E)
         Hderiv_MN_denom = calc_Hderiv_part(Hderiv_eigenbasis_denom, M_indices, N_indices)
         for k in 1:3
             for l in 1:3
@@ -808,34 +809,44 @@ function calc_F_deriv3(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hd
     Zel = calc_Zel(energies, T)
     Hderiv_eigenbasis = [states'*Hderivcomp*states for Hderivcomp in Hderiv]
     degenerate_sets = determine_degenerate_sets(energies)
-    Fderiv3 = im*zeros(3, 3)
+    Fderiv3 = im*zeros(3, 3, 3)
     for M in degenerate_sets
         M_indices = M.states
         N_indices = [i for i in 1:length(energies) if !(i in M_indices)]
         Boltzmann_factor = exp(-beta*M.E)
-        Hderiv_MM = [Hderivcomp[M_indices, M_indices] for Hderivcomp in Hderiv_eigenbasis]
-        Hderiv_MN = [Hderivcomp[M_indices, N_indices] for Hderivcomp in Hderiv_eigenbasis]
-        Hderiv_eigenbasis_denom = deepcopy(Hderiv_eigenbasis)
-        for n in 1:length(energies)
-            for i in 1:3
-                Hderiv_eigenbasis_denom[i][:, n] /= (energies[n] - M.E)
-            end
-        end
-        Hderiv_MN_denom = [Hderivcomp[M_indices, N_indices] for Hderivcomp in Hderiv_eigenbasis_denom]
+        Hderiv_MM = calc_Hderiv_part(Hderiv_eigenbasis, M_indices, M_indices)
+        Hderiv_MN = calc_Hderiv_part(Hderiv_eigenbasis, M_indices, N_indices)
+        Hderiv_NN = calc_Hderiv_part(Hderiv_eigenbasis, N_indices, N_indices)
+        Hderiv_eigenbasis_denom = calc_Hderiv_eigenbasis_denom(Hderiv_eigenbasis, energies .- M.E)
+        Hderiv_MN_denom = calc_Hderiv_part(Hderiv_eigenbasis_denom, M_indices, N_indices)
         for l in 1:3
             for k in 1:3
                 for j in 1:3
-                    part1 = 0.5*beta*tr(Hderiv_MM[k] * Hderiv_MM[l]')
-                    part2 = tr(Hderiv_MN[k] * Hderiv_MN_denom[l]')
-                    Fderiv3[k, l] += Boltzmann_factor * (part1 + part2)
+                    part1 = (1/6)*beta^2*tr(Hderiv_MM[l] * Hderiv_MM[k] * Hderiv_MM[j])
+                    part2 = beta*tr(Hderiv_MN_denom[l] * Hderiv_MN[k]' * Hderiv_MM[j])
+                    part3 = - tr(Hderiv_MN_denom[l] * Hderiv_MN_denom[k]' * Hderiv_MM[j])
+                    part4 = tr(Hderiv_MN_denom[l] * Hderiv_NN[k] * Hderiv_MN_denom[j]')
+                    Fderiv3[l,k,j] += Boltzmann_factor * (part1 + part2 + part3 + part4)
                 end
             end
         end
     end
-    #Fderiv3 *= -1/Zel
+    Fderiv3 *= 1/Zel
     Fderiv1 = calc_F_deriv1(energies, states, Hderiv, T)
-    #Fderiv2 += 0.5*beta* Fderiv1*Fderiv1'
-    #Fderiv2 += transpose(Fderiv2)  # symmetrization
+    Fderiv2 = calc_F_deriv2(energies, states, Hderiv, T)
+    for l in 1:3
+        for k in 1:3
+            for j in 1:3
+                Fderiv3[l,k,j] += -(1/6)*beta^2*Fderiv1[l]*Fderiv1[k]*Fderiv1[j]
+                Fderiv3[l,k,j] += 0.5*beta*Fderiv1[l]*Fderiv2[k,j]
+            end
+        end
+    end
+    # symmetrization:
+    nindices = 3
+    for k in 1:factorial(nindices)   # loop over all permutations of three indices
+        Fderiv3 += permutedims(Fderiv3, Permutation(nindices,k))
+    end
     @assert norm(imag(Fderiv3)) < 1e-5
     return real(Fderiv3)
 end
