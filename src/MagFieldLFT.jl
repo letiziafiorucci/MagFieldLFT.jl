@@ -766,19 +766,19 @@ function calc_F_deriv2(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hd
         M_indices = M.states
         N_indices = [i for i in 1:length(energies) if !(i in M_indices)]
         Boltzmann_factor = exp(-beta*M.E)
-        Hderiv_part1 = [Hderivcomp[M_indices, M_indices] for Hderivcomp in Hderiv_eigenbasis]
-        Hderiv_part2 = [Hderivcomp[M_indices, N_indices] for Hderivcomp in Hderiv_eigenbasis]
+        Hderiv_MM = [Hderivcomp[M_indices, M_indices] for Hderivcomp in Hderiv_eigenbasis]
+        Hderiv_MN = [Hderivcomp[M_indices, N_indices] for Hderivcomp in Hderiv_eigenbasis]
         Hderiv_eigenbasis_mod = deepcopy(Hderiv_eigenbasis)
         for n in 1:length(energies)
             for i in 1:3
                 Hderiv_eigenbasis_mod[i][:, n] /= (energies[n] - M.E)
             end
         end
-        Hderiv_part2_mod = [Hderivcomp[M_indices, N_indices] for Hderivcomp in Hderiv_eigenbasis_mod]
+        Hderiv_MN_denom = [Hderivcomp[M_indices, N_indices] for Hderivcomp in Hderiv_eigenbasis_mod]
         for k in 1:3
             for l in 1:3
-                part1 = 0.5*beta*tr(Hderiv_part1[k] * Hderiv_part1[l]')
-                part2 = tr(Hderiv_part2[k] * Hderiv_part2_mod[l]')
+                part1 = 0.5*beta*tr(Hderiv_MM[k] * Hderiv_MM[l]')
+                part2 = tr(Hderiv_MN[k] * Hderiv_MN_denom[l]')
                 Fderiv2[k, l] += Boltzmann_factor * (part1 + part2)
             end
         end
