@@ -548,6 +548,23 @@ function test_KurlandMcGarvey_vs_finitefield_Lebedev()
     return norm(KMcG_shifts - finitefield_shifts) < 1.0e-6
 end
 
+function test_Fderiv2_numeric_vs_analytic()
+    param = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
+    B0_mol = [0.0, 0.0, 1.0e-4]
+    h = 1.0e-10   # displacement for numerical derivative
+    T = 1.0
+    Fderiv1_0 = MagFieldLFT.calc_F_deriv1(param, T, B0_mol)
+    Fderiv1_x = MagFieldLFT.calc_F_deriv1(param, T, B0_mol+[h, 0, 0])
+    Fderiv1_y = MagFieldLFT.calc_F_deriv1(param, T, B0_mol+[0, h, 0])
+    Fderiv1_z = MagFieldLFT.calc_F_deriv1(param, T, B0_mol+[0, 0, h])
+    Fderiv2 = MagFieldLFT.calc_F_deriv2(param, T, B0_mol)
+    Fderiv2_numeric = zeros(3,3)
+    Fderiv2_numeric[1, :] = (1/h)*(Fderiv1_x - Fderiv1_0)
+    Fderiv2_numeric[2, :] = (1/h)*(Fderiv1_y - Fderiv1_0)
+    Fderiv2_numeric[3, :] = (1/h)*(Fderiv1_z - Fderiv1_0)
+    return norm(Fderiv2-Fderiv2_numeric) < 0.1
+end
+
 
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
@@ -589,4 +606,5 @@ end
     @test test_KurlandMcGarvey()
     @test test_KurlandMcGarvey_vs_finitefield()
     @test test_KurlandMcGarvey_vs_finitefield_Lebedev()
+    @test test_Fderiv2_numeric_vs_analytic()
 end

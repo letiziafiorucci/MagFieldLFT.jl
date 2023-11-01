@@ -756,11 +756,8 @@ function determine_degenerate_sets(energies::Vector{Float64})
     return degenerate_sets
 end
 
-function calc_Fderiv2(param::LFTParam, T::Real, B0_mol::Vector{Float64})
+function calc_F_deriv2(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hderiv::Vector{Matrix{ComplexF64}}, T::Real)
     beta = 1/(kB*T)
-    H_fieldfree, L, S, Mel = calc_operators_SDbasis(param)
-    Hderiv = -Mel
-    energies, states = calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
     Zel = calc_Zel(energies, T)
     Hderiv_eigenbasis = [states'*Hderivcomp*states for Hderivcomp in Hderiv]
     degenerate_sets = determine_degenerate_sets(energies)
@@ -789,14 +786,27 @@ function calc_Fderiv2(param::LFTParam, T::Real, B0_mol::Vector{Float64})
     Fderiv2 *= -1/Zel
     Fderiv1 = calc_F_deriv1(energies, states, Hderiv, T)
     Fderiv2 += 0.5*beta* Fderiv1*Fderiv1'
-    Fderiv2 += Fderiv2'  # symmetrization
+    Fderiv2 += transpose(Fderiv2)  # symmetrization
     @assert norm(imag(Fderiv2)) < 1e-5
     return real(Fderiv2)
 end
 
+function F_deriv_param2states(calc_F_derivx::Function)
+    function calc_F_deriv_param(param::LFTParam, T::Real, B0_mol::Vector{Float64})
+        H_fieldfree, L, S, Mel = calc_operators_SDbasis(param)
+        Hderiv = -Mel
+        energies, states = calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
+        return calc_F_derivx(energies, states, Hderiv, T)
+    end
+    return calc_F_deriv_param
+end
+
+calc_F_deriv1(param::LFTParam, T::Real, B0_mol::Vector{Float64}) = F_deriv_param2states(calc_F_deriv1)(param, T, B0_mol)
+calc_F_deriv2(param::LFTParam, T::Real, B0_mol::Vector{Float64}) = F_deriv_param2states(calc_F_deriv2)(param, T, B0_mol)
+
 function calc_susceptibility_vanVleck(param::LFTParam, T::Real)
     B = [0.0, 0.0, 0.0]
-    Fderiv2 = calc_Fderiv2(param, T, B)
+    Fderiv2 = calc_F_deriv2(param, T, B)
     return -4pi*alpha^2 * Fderiv2
 end
 
