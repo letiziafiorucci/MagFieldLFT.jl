@@ -565,6 +565,24 @@ function test_Fderiv2_numeric_vs_analytic()
     return norm(Fderiv2-Fderiv2_numeric) < 0.1
 end
 
+function test_Fderiv3_numeric_vs_analytic()
+    param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
+    B0_mol = [0.0, 0.0, 1.0e-4]
+    h = 1.0e-10   # displacement for numerical derivative
+    T = 1.0
+    Fderiv2_0 = MagFieldLFT.calc_F_deriv2(param, T, B0_mol)
+    Fderiv2_x = MagFieldLFT.calc_F_deriv2(param, T, B0_mol+[h, 0, 0])
+    Fderiv2_y = MagFieldLFT.calc_F_deriv2(param, T, B0_mol+[0, h, 0])
+    Fderiv2_z = MagFieldLFT.calc_F_deriv2(param, T, B0_mol+[0, 0, h])
+    Fderiv3 = MagFieldLFT.calc_F_deriv3(param, T, B0_mol)
+    Fderiv3_numeric = zeros(3,3,3)
+    Fderiv3_numeric[1, :, :] = (1/h)*(Fderiv2_x - Fderiv2_0)
+    Fderiv3_numeric[2, :, :] = (1/h)*(Fderiv2_y - Fderiv2_0)
+    Fderiv3_numeric[3, :, :] = (1/h)*(Fderiv2_z - Fderiv2_0)
+    # note: elements of the tensor have magnitudes that are all larger than 1e5
+    return norm(Fderiv3-Fderiv3_numeric) < 6000
+end
+
 
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
@@ -607,4 +625,5 @@ end
     @test test_KurlandMcGarvey_vs_finitefield()
     @test test_KurlandMcGarvey_vs_finitefield_Lebedev()
     @test test_Fderiv2_numeric_vs_analytic()
+    @test test_Fderiv3_numeric_vs_analytic()
 end

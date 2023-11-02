@@ -844,11 +844,12 @@ function calc_F_deriv3(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hd
     end
     # symmetrization:
     nindices = 3
+    Fderiv3_symmetrized = im*zeros(3,3,3)
     for k in 1:factorial(nindices)   # loop over all permutations of three indices
-        Fderiv3 += permutedims(Fderiv3, Permutation(nindices,k))
+        Fderiv3_symmetrized += permutedims(Fderiv3, Permutation(nindices,k))
     end
-    @assert norm(imag(Fderiv3)) < 1e-5
-    return real(Fderiv3)
+    @assert norm(imag(Fderiv3_symmetrized)) < 1e-4
+    return real(Fderiv3_symmetrized)
 end
 
 function F_deriv_param2states(calc_F_derivx::Function)
@@ -863,6 +864,7 @@ end
 
 calc_F_deriv1(param::LFTParam, T::Real, B0_mol::Vector{Float64}) = F_deriv_param2states(calc_F_deriv1)(param, T, B0_mol)
 calc_F_deriv2(param::LFTParam, T::Real, B0_mol::Vector{Float64}) = F_deriv_param2states(calc_F_deriv2)(param, T, B0_mol)
+calc_F_deriv3(param::LFTParam, T::Real, B0_mol::Vector{Float64}) = F_deriv_param2states(calc_F_deriv3)(param, T, B0_mol)
 
 function calc_susceptibility_vanVleck(param::LFTParam, T::Real)
     B = [0.0, 0.0, 0.0]
