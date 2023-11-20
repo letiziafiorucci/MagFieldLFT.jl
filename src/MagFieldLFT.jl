@@ -764,7 +764,7 @@ function calc_Hderiv_part(Hderiv_eigenbasis::Vector{Matrix{ComplexF64}}, I_indic
     return [Hderivcomp[I_indices, J_indices] for Hderivcomp in Hderiv_eigenbasis]
 end
 
-function calc_Hderiv_eigenbasis_denom(Hderiv_eigenbasis::Vector{Matrix{ComplexF64}}, denoms)
+function calc_Hderiv_eigenbasis_denom(Hderiv_eigenbasis::Vector{Matrix{ComplexF64}}, denoms::Vector{Float64})
     Hderiv_eigenbasis_denom = deepcopy(Hderiv_eigenbasis)
     for n in 1:length(denoms)
         for i in 1:3
@@ -852,6 +852,77 @@ function calc_F_deriv3(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hd
     return real(Fderiv3_symmetrized)
 end
 
+function calc_F_deriv4(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hderiv::Vector{Matrix{ComplexF64}}, T::Real)
+    beta = 1/(kB*T)
+    Zel = calc_Zel(energies, T)
+    Hderiv_eigenbasis = [states'*Hderivcomp*states for Hderivcomp in Hderiv]
+    degenerate_sets = determine_degenerate_sets(energies)
+    Fderiv4 = im*zeros(3, 3, 3, 3)
+    for M in degenerate_sets
+        M_indices = M.states
+        N_indices = [i for i in 1:length(energies) if !(i in M_indices)]
+        Boltzmann_factor = exp(-beta*M.E)
+        Hderiv_MM = calc_Hderiv_part(Hderiv_eigenbasis, M_indices, M_indices)
+        Hderiv_MN = calc_Hderiv_part(Hderiv_eigenbasis, M_indices, N_indices)
+        Hderiv_NN = calc_Hderiv_part(Hderiv_eigenbasis, N_indices, N_indices)
+        Hderiv_eigenbasis_denom = calc_Hderiv_eigenbasis_denom(Hderiv_eigenbasis, energies .- M.E)
+        Hderiv_eigenbasis_denom2 = calc_Hderiv_eigenbasis_denom(Hderiv_eigenbasis, (energies .- M.E) .* (energies .- M.E))
+        Hderiv_MN_denom = calc_Hderiv_part(Hderiv_eigenbasis_denom, M_indices, N_indices)
+        Hderiv_MN_denom2 = calc_Hderiv_part(Hderiv_eigenbasis_denom2, M_indices, N_indices)
+        Hderiv_NN_denom = calc_Hderiv_part(Hderiv_eigenbasis_denom, N_indices, N_indices)
+        for l in 1:3, k in 1:3, j in 1:3, i in 1:3
+            part1 = (1/24)*beta^3*tr(Hderiv_MM[l] * Hderiv_MM[k] * Hderiv_MM[j] * Hderiv_MM[i])
+            part2 = (1/2)*beta^2*tr(Hderiv_MN_denom[l] * Hderiv_MN[k]' * Hderiv_MM[j] * Hderiv_MM[i])
+            part3 = -beta*tr(Hderiv_MN_denom[l] * Hderiv_MN[k]' * Hderiv_MM[j] * Hderiv_MM[i])
+            part4 = tr(Hderiv_MN_denom2[l] * Hderiv_MN_denom[k]' * Hderiv_MM[j] * Hderiv_MM[i])
+            part5 = 0.5*beta*tr(Hderiv_MN_denom[l] * Hderiv_MN[k]' * Hderiv_MN_denom[j] * Hderiv_MN[i]')
+            part6 = beta*tr(Hderiv_MN_denom[l] * Hderiv_NN[k] * Hderiv_MN_denom[j]' * Hderiv_MM[i])
+            part7 = -tr(Hderiv_MN_denom2[l] * Hderiv_MN[k]' * Hderiv_MN_denom[j] * Hderiv_MN[i]')
+            part8 = -tr(Hderiv_MN_denom[l] * Hderiv_NN[k] * Hderiv_MN_denom2[j]' * Hderiv_MM[i])
+            part9 = -tr(Hderiv_MN_denom2[l] * Hderiv_NN[k] * Hderiv_MN_denom[j]' * Hderiv_MM[i])
+            part10 = tr(Hderiv_MN_denom[l] * Hderiv_NN_denom[k] * Hderiv_NN_denom[j] * Hderiv_MN[i]')
+            Fderiv4[l,k,j,i] += Boltzmann_factor * (part1 + part2 + part3 + part4 + part5 +
+                                                    part6 + part7 + part8 + part9 + part10)
+            #Fderiv4[l,k,j,i] = 0.0
+        end
+    end
+    Fderiv4 *= -1/Zel
+    Fderiv1 = calc_F_deriv1(energies, states, Hderiv, T)
+    Fderiv2 = calc_F_deriv2(energies, states, Hderiv, T)
+    Fderiv3 = calc_F_deriv3(energies, states, Hderiv, T)
+    for l in 1:3, k in 1:3, j in 1:3, i in 1:3
+        Fderiv4[l,k,j,i] += (1/24)*beta^3*Fderiv1[l]*Fderiv1[k]*Fderiv1[j]*Fderiv1[i] -
+                        (1/4)*beta^2*Fderiv1[l]*Fderiv1[k]*Fderiv2[j,i] +
+                        (1/6)*beta*Fderiv1[l]*Fderiv3[k,j,i] +
+                        (1/8)*beta*Fderiv2[l,k]*Fderiv2[j,i]
+    end
+    # symmetrization:
+    nindices = 4
+    Fderiv4_symmetrized = im*zeros(3,3,3,3)
+    for k in 1:factorial(nindices)   # loop over all permutations of three indices
+        Fderiv4_symmetrized += permutedims(Fderiv4, Permutation(nindices,k))
+    end
+    #for l in 1:3, k in 1:3, j in 1:3, i in 1:3
+    #    #Fderiv4_symmetrized[l,k,j,i] += beta^3*Fderiv1[l]*Fderiv1[k]*Fderiv1[j]*Fderiv1[i]
+    #    #Fderiv4_symmetrized[l,k,j,i] += -beta^2*(Fderiv2[i,j]*Fderiv1[k]*Fderiv1[l] +
+    #    #                                Fderiv2[i,k]*Fderiv1[j]*Fderiv1[l] +
+    #    #                                Fderiv2[i,l]*Fderiv1[j]*Fderiv1[k] +
+    #    #                                Fderiv2[l,k]*Fderiv1[i]*Fderiv1[j] +
+    #    #                                Fderiv2[l,j]*Fderiv1[i]*Fderiv1[k] +
+    #    #                                Fderiv2[k,j]*Fderiv1[i]*Fderiv1[l])
+    #    #Fderiv4_symmetrized[l,k,j,i] += beta*(Fderiv1[l]*Fderiv3[k,j,i] +
+    #    #                            Fderiv1[k]*Fderiv3[i,j,l] +
+    #    #                            Fderiv1[j]*Fderiv3[i,k,l] +
+    #    #                            Fderiv1[i]*Fderiv3[j,k,l])
+    #    Fderiv4_symmetrized[l,k,j,i] += beta*(Fderiv2[l,k]*Fderiv2[j,i] +
+    #                                Fderiv2[l,i]*Fderiv2[k,j] +
+    #                                Fderiv2[i,k]*Fderiv2[l,j])
+    #end
+    #display(Fderiv4_symmetrized)
+    @assert norm(imag(Fderiv4_symmetrized))/norm(real(Fderiv4_symmetrized)) < 1e-10
+    return real(Fderiv4_symmetrized)
+end
+
 function F_deriv_param2states(calc_F_derivx::Function)
     function calc_F_deriv_param(param::LFTParam, T::Real, B0_mol::Vector{Float64})
         H_fieldfree, L, S, Mel = calc_operators_SDbasis(param)
@@ -865,6 +936,7 @@ end
 calc_F_deriv1(param::LFTParam, T::Real, B0_mol::Vector{Float64}) = F_deriv_param2states(calc_F_deriv1)(param, T, B0_mol)
 calc_F_deriv2(param::LFTParam, T::Real, B0_mol::Vector{Float64}) = F_deriv_param2states(calc_F_deriv2)(param, T, B0_mol)
 calc_F_deriv3(param::LFTParam, T::Real, B0_mol::Vector{Float64}) = F_deriv_param2states(calc_F_deriv3)(param, T, B0_mol)
+calc_F_deriv4(param::LFTParam, T::Real, B0_mol::Vector{Float64}) = F_deriv_param2states(calc_F_deriv4)(param, T, B0_mol)
 
 function calc_susceptibility_vanVleck(param::LFTParam, T::Real)
     B = [0.0, 0.0, 0.0]
