@@ -873,7 +873,7 @@ function calc_F_deriv4(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hd
         for l in 1:3, k in 1:3, j in 1:3, i in 1:3
             part1 = (1/24)*beta^3*tr(Hderiv_MM[l] * Hderiv_MM[k] * Hderiv_MM[j] * Hderiv_MM[i])
             part2 = (1/2)*beta^2*tr(Hderiv_MN_denom[l] * Hderiv_MN[k]' * Hderiv_MM[j] * Hderiv_MM[i])
-            part3 = -beta*tr(Hderiv_MN_denom[l] * Hderiv_MN[k]' * Hderiv_MM[j] * Hderiv_MM[i])
+            part3 = -beta*tr(Hderiv_MN_denom2[l] * Hderiv_MN[k]' * Hderiv_MM[j] * Hderiv_MM[i])
             part4 = tr(Hderiv_MN_denom2[l] * Hderiv_MN_denom[k]' * Hderiv_MM[j] * Hderiv_MM[i])
             part5 = 0.5*beta*tr(Hderiv_MN_denom[l] * Hderiv_MN[k]' * Hderiv_MN_denom[j] * Hderiv_MN[i]')
             part6 = beta*tr(Hderiv_MN_denom[l] * Hderiv_NN[k] * Hderiv_MN_denom[j]' * Hderiv_MM[i])
@@ -883,7 +883,6 @@ function calc_F_deriv4(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hd
             part10 = tr(Hderiv_MN_denom[l] * Hderiv_NN_denom[k] * Hderiv_NN_denom[j] * Hderiv_MN[i]')
             Fderiv4[l,k,j,i] += Boltzmann_factor * (part1 + part2 + part3 + part4 + part5 +
                                                     part6 + part7 + part8 + part9 + part10)
-            #Fderiv4[l,k,j,i] = 0.0
         end
     end
     Fderiv4 *= -1/Zel
@@ -902,23 +901,6 @@ function calc_F_deriv4(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hd
     for k in 1:factorial(nindices)   # loop over all permutations of three indices
         Fderiv4_symmetrized += permutedims(Fderiv4, Permutation(nindices,k))
     end
-    #for l in 1:3, k in 1:3, j in 1:3, i in 1:3
-    #    #Fderiv4_symmetrized[l,k,j,i] += beta^3*Fderiv1[l]*Fderiv1[k]*Fderiv1[j]*Fderiv1[i]
-    #    #Fderiv4_symmetrized[l,k,j,i] += -beta^2*(Fderiv2[i,j]*Fderiv1[k]*Fderiv1[l] +
-    #    #                                Fderiv2[i,k]*Fderiv1[j]*Fderiv1[l] +
-    #    #                                Fderiv2[i,l]*Fderiv1[j]*Fderiv1[k] +
-    #    #                                Fderiv2[l,k]*Fderiv1[i]*Fderiv1[j] +
-    #    #                                Fderiv2[l,j]*Fderiv1[i]*Fderiv1[k] +
-    #    #                                Fderiv2[k,j]*Fderiv1[i]*Fderiv1[l])
-    #    #Fderiv4_symmetrized[l,k,j,i] += beta*(Fderiv1[l]*Fderiv3[k,j,i] +
-    #    #                            Fderiv1[k]*Fderiv3[i,j,l] +
-    #    #                            Fderiv1[j]*Fderiv3[i,k,l] +
-    #    #                            Fderiv1[i]*Fderiv3[j,k,l])
-    #    Fderiv4_symmetrized[l,k,j,i] += beta*(Fderiv2[l,k]*Fderiv2[j,i] +
-    #                                Fderiv2[l,i]*Fderiv2[k,j] +
-    #                                Fderiv2[i,k]*Fderiv2[l,j])
-    #end
-    #display(Fderiv4_symmetrized)
     @assert norm(imag(Fderiv4_symmetrized))/norm(real(Fderiv4_symmetrized)) < 1e-10
     return real(Fderiv4_symmetrized)
 end

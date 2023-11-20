@@ -597,11 +597,6 @@ function test_Fderiv4_numeric_vs_analytic()
     Fderiv4_numeric[1, :, :, :] = (1/h)*(Fderiv3_x - Fderiv3_0)
     Fderiv4_numeric[2, :, :, :] = (1/h)*(Fderiv3_y - Fderiv3_0)
     Fderiv4_numeric[3, :, :, :] = (1/h)*(Fderiv3_z - Fderiv3_0)
-    #println("Analytic:")
-    #display(Fderiv4)
-    #println("Numeric:")
-    #display(Fderiv4_numeric)
-    display(rel_diff_norm(Fderiv4, Fderiv4_numeric))
     return rel_diff_norm(Fderiv4, Fderiv4_numeric) < 1e-4
 end
 
@@ -619,7 +614,6 @@ function test_Fderiv4_numeric_vs_analytic_zerofield()
     Fderiv4_numeric[1, :, :, :] = (1/h)*(Fderiv3_x - Fderiv3_0)
     Fderiv4_numeric[2, :, :, :] = (1/h)*(Fderiv3_y - Fderiv3_0)
     Fderiv4_numeric[3, :, :, :] = (1/h)*(Fderiv3_z - Fderiv3_0)
-    display(rel_diff_norm(Fderiv4, Fderiv4_numeric))
     return rel_diff_norm(Fderiv4, Fderiv4_numeric) < 1e-4
 end
 
