@@ -879,7 +879,7 @@ function calc_F_deriv4(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hd
             part6 = beta*tr(Hderiv_MN_denom[l] * Hderiv_NN[k] * Hderiv_MN_denom[j]' * Hderiv_MM[i])
             part7 = -tr(Hderiv_MN_denom2[l] * Hderiv_MN[k]' * Hderiv_MN_denom[j] * Hderiv_MN[i]')
             part8 = -tr(Hderiv_MN_denom[l] * Hderiv_NN[k] * Hderiv_MN_denom2[j]' * Hderiv_MM[i])
-            part9 = -tr(Hderiv_MN_denom2[l] * Hderiv_NN[k] * Hderiv_MN_denom[j]' * Hderiv_MM[i])
+            part9 = part8'
             part10 = tr(Hderiv_MN_denom[l] * Hderiv_NN_denom[k] * Hderiv_NN_denom[j] * Hderiv_MN[i]')
             Fderiv4[l,k,j,i] += Boltzmann_factor * (part1 + part2 + part3 + part4 + part5 +
                                                     part6 + part7 + part8 + part9 + part10)
