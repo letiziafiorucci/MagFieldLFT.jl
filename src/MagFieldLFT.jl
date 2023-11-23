@@ -430,27 +430,32 @@ function calc_H_nonrel(param::LFTParam, exc::ExcitationLists)
     return H_single + H_double
 end
 
+function calc_SOCintegrals(zeta::Float64, l::Int)
+    lz, lplus, lminus = calc_lops_real(l::Int)
+    return zeta*lz, zeta*lplus, zeta*lminus
+end
+
 """
 zeta: SOC parameter
 l: angular momentum of partially filled shell
 exc: Lists of excitations and coupling coefficients.
 """
-function calc_SOC(zeta::Float64, l::Int, exc::ExcitationLists)
+function calc_SOC(SOCints::NTuple{3, Matrix{ComplexF64}}, exc::ExcitationLists)
     Dim = length(exc.alpha)
     H_SOC = im*zeros(Dim, Dim)
-    lz, lplus, lminus = calc_lops_real(l::Int)
+    SOCz, SOCplus, SOCminus = SOCints
     for J in 1:Dim
         for (Ii,pi,qi,gammai) in exc.minus[J]
-            H_SOC[Ii,J] += 0.5*zeta*lplus[pi,qi]*gammai
+            H_SOC[Ii,J] += 0.5*SOCplus[pi,qi]*gammai
         end
         for (Ii,pi,qi,gammai) in exc.plus[J]
-            H_SOC[Ii,J] += 0.5*zeta*lminus[pi,qi]*gammai
+            H_SOC[Ii,J] += 0.5*SOCminus[pi,qi]*gammai
         end
         for (Ii,pi,qi,gammai) in exc.alpha[J]
-            H_SOC[Ii,J] += 0.5*zeta*lz[pi,qi]*gammai
+            H_SOC[Ii,J] += 0.5*SOCz[pi,qi]*gammai
         end
         for (Ii,pi,qi,gammai) in exc.beta[J]
-            H_SOC[Ii,J] -= 0.5*zeta*lz[pi,qi]*gammai
+            H_SOC[Ii,J] -= 0.5*SOCz[pi,qi]*gammai
         end
     end
     return H_SOC
@@ -459,7 +464,8 @@ end
 function calc_H_fieldfree(param::LFTParam, exc::ExcitationLists)
     norb = size(param.hLFT)[1]
     l = (norb-1)÷2
-    H_fieldfree = calc_H_nonrel(param, exc) + calc_SOC(param.zeta, l, exc)
+    SOCints = calc_SOCintegrals(param.zeta, l)
+    H_fieldfree = calc_H_nonrel(param, exc) + calc_SOC(SOCints, exc)
     return Hermitian(H_fieldfree)
 end
 
