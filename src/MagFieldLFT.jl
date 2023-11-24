@@ -1,6 +1,6 @@
 module MagFieldLFT
 
-using LinearAlgebra, Permutations, OutputParser, DelimitedFiles
+using LinearAlgebra, Permutations, OutputParser, DelimitedFiles, Printf
 
 export read_AILFT_params_ORCA, LFTParam, lebedev_grids
 
@@ -969,6 +969,27 @@ function MHz2au(nu::Real)
     return Tesla2au(MHz2Tesla(nu))
 end
 
+"""
+C: Coefficients of the state in the Slater determinant basis
+U: Matrix whose columns are coefficients of basis states in the Slater determinant basis.
+   This matrix must be unitary, i.e., the basis must be orthonormal!
+labels: Unique identifiers for the basis states (e.g. quantum numbers)
+thresh: Total percentage to which the printed contributions must at least sum up to (default: 0.98)
+"""
+function print_composition(C::Vector{T1}, U::Matrix{T2}, labels::Vector{String}, thresh::Number=0.98, io::IO=stdout) where {T1 <: Number, T2 <: Number}
+    C_newbasis = U'*C
+    percentages = C_newbasis .* conj(C_newbasis)
+    p = sortperm(percentages, rev=true)
+    percentages_sorted = percentages[p]
+    labels_sorted = labels[p]
+    total_percentage = 0.0
+    i = 1
+    while total_percentage < thresh
+        @printf(io, "%6.2f%%  %s\n", percentages_sorted[i]*100, labels_sorted[i])
+        total_percentage += percentages_sorted[i]
+        i += 1
+    end
+end
 
 
 end

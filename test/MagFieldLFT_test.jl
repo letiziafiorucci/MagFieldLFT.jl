@@ -621,6 +621,27 @@ function rel_diff_norm(value, ref)
     return norm(value-ref)/norm(ref)
 end
 
+function test_print_composition()
+    C = [1,2,3]
+    C = C/norm(C) # normalize
+    U = [1 0 0; 0 1 0; 0 0 1]
+    labels = ["ex", "ey", "ez"]
+    thresh = 0.98
+    buf = IOBuffer()
+    MagFieldLFT.print_composition(C, U, labels, thresh, buf)
+    printed_string = String(take!(buf))
+    ref = """
+     64.29%  ez
+     28.57%  ey
+      7.14%  ex
+    """
+    return printed_string == ref
+end
+
+function test_print_composition2()
+    #param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
+end
+
 
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
@@ -666,4 +687,5 @@ end
     @test test_Fderiv3_numeric_vs_analytic()
     @test test_Fderiv4_numeric_vs_analytic()
     @test test_Fderiv4_numeric_vs_analytic_zerofield()
+    @test test_print_composition()
 end
