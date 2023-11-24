@@ -639,7 +639,13 @@ function test_print_composition()
 end
 
 function test_print_composition2()
-    #param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
+    param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
+    norb = size(param.hLFT)[1]
+    l = (norb-1)÷2
+    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
+    energies_rel, states_rel = MagFieldLFT.calc_solutions(H_fieldfree)
+    H_nonrel = MagFieldLFT.calc_H_nonrel(param, exc)
 end
 
 

@@ -547,7 +547,7 @@ function read_AILFT_params_ORCA(outfile::String, method::String)
     return LFTParam(nel, norb, hLFT, F, zeta)
 end
 
-const HermMat = Hermitian{ComplexF64, Matrix{ComplexF64}}   # Complex hermitian matrix
+const HermMat = Hermitian{T, Matrix{T}} where T <: Number  # Complex hermitian (or real symmetric) matrix
 
 function calc_H_magfield(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64})
     H_magfield = H_fieldfree + 0.5*(L[1]*B[1] + L[2]*B[2] + L[3]*B[3]) + S[1]*B[1] + S[2]*B[2] + S[3]*B[3]
@@ -587,7 +587,7 @@ end
 
 """
 H_fieldfree: Hamiltonian in the absence of a magnetic field
-H: Hamiltonian whose eigenstates and eigenenergies we want to calculate (relative to fieldfree E0)
+H: Hamiltonian whose eigenstates and eigenenergies we want to calculate (relative to fieldfree ground state energy E0)
 """
 function calc_solutions(H_fieldfree::HermMat, H::HermMat)
     E0 = fieldfree_GS_energy(H_fieldfree)
@@ -989,6 +989,28 @@ function print_composition(C::Vector{T1}, U::Matrix{T2}, labels::Vector{String},
         total_percentage += percentages_sorted[i]
         i += 1
     end
+end
+
+function get_basis_nonrelstates(param)
+    norb = size(param.hLFT)[1]
+    l = (norb-1)÷2
+    exc = calc_exclists(l,param.nel)
+    return get_basis_nonrelstates(param, exc)
+end
+
+function get_basis_nonrelstates(param, exc)
+    H = MagFieldLFT.calc_H_nonrel(param, exc)
+    energies, states = calc_solutions(Hermitian(H))
+    norb = size(param.hLFT)[1]
+    l = (norb-1)÷2
+    Sx, Sy, Sz = calc_S(l, exc)
+    S2 = Sx*Sx + Sy*Sy + Sz*Sz
+
+    S2_eigenbasis = real(diag(states'*S2*states))
+    Sz_eigenbasis = real(diag(states'*Sz*states))
+    println(energies)
+    println(S2_eigenbasis)
+    println(Sz_eigenbasis)
 end
 
 
