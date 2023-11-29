@@ -32,9 +32,18 @@ end
 
 lebedev_grids = setup_Lebedev_grids()
 
+"""
+nel: Number of electrons
+norb: Number of orbitals (=2l+1)
+l: Angular momentum of the open shell (l=2 for d orbitals, l=3 for f orbitals)
+hLFT: One-electron ligand field matrix
+F: Racah parameters
+zeta: Spin-orbit coupling parameter
+"""
 struct LFTParam
     nel::Int64
     norb::Int64
+    l::Int64
     hLFT::Matrix{Float64}
     F::Dict{Int64, Float64}
     zeta::Float64
@@ -380,6 +389,11 @@ function calc_exclists(l::Int, N::Int)
     return ExcitationLists(L_alpha, L_beta, L_plus, L_minus)
 end
 
+function calc_exclists(param::LFTParam)
+    l = (param.norb-1)÷2
+    return calc_exclists(l,param.nel)
+end
+
 function calc_singletop(int::Matrix{T}, exc::ExcitationLists) where T<:Number
     Dim = length(exc.alpha)
     H_single = convert(T, 0) * zeros(Dim, Dim)   # zero matrix with same type as int
@@ -513,6 +527,7 @@ TO DO: extend for f elements and for SOC parameter.
 function read_AILFT_params_ORCA(outfile::String, method::String)
     nel = parse_int(outfile, ["nel"], 0, 3)
     norb = parse_int(outfile, ["norb"], 0, 3)
+    l = (norb-1)÷2
     if norb == 5
         hLFT = Matrix{Float64}(undef, norb, norb)
         for row in 1:norb
@@ -544,7 +559,7 @@ function read_AILFT_params_ORCA(outfile::String, method::String)
         F = Dict(0 => F0, 2 => F2/15/15, 4 => F4/33/33, 6 => (5/429)^2 * F6)
         zeta = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "ZETA_F"], 0, 2)/219474.63  # convert from cm-1 to Hartree
     end
-    return LFTParam(nel, norb, hLFT, F, zeta)
+    return LFTParam(nel, norb, l, hLFT, F, zeta)
 end
 
 const HermMat = Hermitian{T, Matrix{T}} where T <: Number  # Complex hermitian (or real symmetric) matrix
@@ -1016,13 +1031,13 @@ end
 """
 This function assumes that the eigenvalues are sorted (i.e., equal eigenvalues have neighboring indices)
 """
-function group_eigenvalues(values::Vector{T}) where T<:Real
+function group_eigenvalues(values::Vector{T}, thresh::Real=1.0e-8) where T<:Real
     indices = Vector{Vector{Int64}}(undef, 0)
-    unique_values = Vector{Int64}(undef, 0)
+    unique_values = Vector{T}(undef, 0)
     current_value = values[1]
     current_indices = [1]
     for i in 2:length(values)
-        if values[i] == current_value
+        if abs(values[i] - current_value) < thresh
             push!(current_indices, i)
         else
             push!(indices, current_indices)
@@ -1036,11 +1051,23 @@ function group_eigenvalues(values::Vector{T}) where T<:Real
     return unique_values, indices
 end
 
-function adapt_basis(C_list::Vector{Matrix{T1}}, labels_list::Vector{Vector{Float64}}, op::Matrix{T2}) where {T1<:Number, T2<:Number}
-    for C in C_list
-        op_C = C'*op*C
+function adapt_basis(C_list::Vector{Matrix{T1}}, labels_list::Vector{Vector{Float64}}, op::HermMat) where {T1<:Number}
+    C_list_new = Vector{Matrix{T1}}(undef, 0)
+    labels_list_new = Vector{Vector{Float64}}(undef, 0)
+    for i in 1:length(C_list)
+        C = C_list[i]
+        op_C = Hermitian(C'*op*C)
         vals, vecs = eigen(op_C)
+        unique_vals, indices = group_eigenvalues(vals)
+        for j in 1:length(unique_vals)
+            V = vecs[:, indices[j]]
+            labels = deepcopy(labels_list[i])
+            push!(labels, unique_vals[j])
+            push!(C_list_new, C*V)
+            push!(labels_list_new, labels)
+        end
     end
+    return C_list_new, labels_list_new
 end
 
 
