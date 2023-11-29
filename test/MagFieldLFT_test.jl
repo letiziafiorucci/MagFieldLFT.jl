@@ -648,6 +648,14 @@ function test_print_composition2()
     H_nonrel = MagFieldLFT.calc_H_nonrel(param, exc)
 end
 
+function test_group_eigenvalues()
+    values = [1,1,2,5,7,7,7,10]
+    unique_values, indices = MagFieldLFT.group_eigenvalues(values)
+    ref_values = [1,2,5,7,10]
+    ref_indices = [[1,2], [3], [4], [5,6,7], [8]]
+    return (unique_values == ref_values) && (indices == ref_indices)
+end
+
 
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
@@ -694,4 +702,5 @@ end
     @test test_Fderiv4_numeric_vs_analytic()
     @test test_Fderiv4_numeric_vs_analytic_zerofield()
     @test test_print_composition()
+    @test test_group_eigenvalues()
 end

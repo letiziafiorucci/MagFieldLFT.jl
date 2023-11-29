@@ -1013,5 +1013,35 @@ function get_basis_nonrelstates(param, exc)
     println(Sz_eigenbasis)
 end
 
+"""
+This function assumes that the eigenvalues are sorted (i.e., equal eigenvalues have neighboring indices)
+"""
+function group_eigenvalues(values::Vector{T}) where T<:Real
+    indices = Vector{Vector{Int64}}(undef, 0)
+    unique_values = Vector{Int64}(undef, 0)
+    current_value = values[1]
+    current_indices = [1]
+    for i in 2:length(values)
+        if values[i] == current_value
+            push!(current_indices, i)
+        else
+            push!(indices, current_indices)
+            push!(unique_values, current_value)
+            current_indices = [i]
+            current_value = values[i]
+        end
+    end
+    push!(indices, current_indices)
+    push!(unique_values, current_value)
+    return unique_values, indices
+end
+
+function adapt_basis(C_list::Vector{Matrix{T1}}, labels_list::Vector{Vector{Float64}}, op::Matrix{T2}) where {T1<:Number, T2<:Number}
+    for C in C_list
+        op_C = C'*op*C
+        vals, vecs = eigen(op_C)
+    end
+end
+
 
 end
