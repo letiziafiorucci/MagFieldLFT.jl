@@ -992,8 +992,17 @@ labels: Unique identifiers for the basis states (e.g. quantum numbers)
 thresh: Total percentage to which the printed contributions must at least sum up to (default: 0.98)
 """
 function print_composition(C::Vector{T1}, U::Matrix{T2}, labels::Vector{String}, thresh::Number=0.98, io::IO=stdout) where {T1 <: Number, T2 <: Number}
-    C_newbasis = U'*C
-    percentages = C_newbasis .* conj(C_newbasis)
+    U_list = [U[:,i:i] for i in 1:size(U)[2]]
+    print_composition(C, U_list, labels, thresh, io)
+end
+
+"""
+Same as before, but now you don't pass a square matrix U with basis vectors, but a list of (in general rectangular)
+matrices U. This is used if some labels are used for whole groups of basis vectors (e.g., if
+we want to print the percentage of a certain total spin).
+"""
+function print_composition(C::Vector{T1}, U_list::Vector{Matrix{T2}}, labels::Vector{String}, thresh::Number=0.98, io::IO=stdout) where {T1 <: Number, T2 <: Number}
+    percentages = [C'*U*U'*C for U in U_list]
     p = sortperm(percentages, rev=true)
     percentages_sorted = percentages[p]
     labels_sorted = labels[p]
