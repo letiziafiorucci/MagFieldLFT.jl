@@ -673,6 +673,47 @@ function test_print_composition2()
     return (ref_ground == printed_string_ground) && (ref_first == printed_string_first)
 end
 
+function test_print_composition_ErIII()
+    param = read_AILFT_params_ORCA("ErCl63-.out", "CASSCF")
+    exc = MagFieldLFT.calc_exclists(param)
+    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
+    energies_rel, states_rel = MagFieldLFT.calc_solutions(H_fieldfree)
+    C_rel_ground = states_rel[:,1]
+    C_list, labels_list = MagFieldLFT.adapt_basis_L2_S2_J2_Jz(param)
+    C_list_alt, labels_list_alt = MagFieldLFT.adapt_basis_L2_S2_J2_Jz(param, "term_symbols")
+    thresh = 0.99
+    buf = IOBuffer()
+    MagFieldLFT.print_composition(C_rel_ground, C_list, labels_list, thresh, buf)
+    printed_string_ground = String(take!(buf))
+    MagFieldLFT.print_composition(C_rel_ground, C_list_alt, labels_list_alt, thresh, buf)
+    printed_string_ground_alt = String(take!(buf))
+    ref_ground = """
+     29.73%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 2.5)
+     27.25%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 6.5)
+     16.29%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-1.5)
+      8.18%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-5.5)
+      6.06%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-2.5)
+      5.62%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-6.5)
+      3.34%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 1.5)
+      1.59%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 5.5)
+      0.57%  (L, S, J, M_J) = ( 7.0, 0.5, 7.5, 2.5)
+      0.53%  (L, S, J, M_J) = ( 7.0, 0.5, 7.5, 6.5)
+    """
+    ref_ground_alt = """
+     29.73%  Term: 4I15/2, M_J = 5/2
+     27.25%  Term: 4I15/2, M_J = 13/2
+     16.29%  Term: 4I15/2, M_J = -3/2
+      8.18%  Term: 4I15/2, M_J = -11/2
+      6.06%  Term: 4I15/2, M_J = -5/2
+      5.62%  Term: 4I15/2, M_J = -13/2
+      3.34%  Term: 4I15/2, M_J = 3/2
+      1.59%  Term: 4I15/2, M_J = 11/2
+      0.57%  Term: 2J15/2, M_J = 5/2
+      0.53%  Term: 2J15/2, M_J = 13/2
+    """
+    return (ref_ground == printed_string_ground) && (ref_ground_alt == printed_string_ground_alt)
+end
+
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
     @test test_createSDs2()
@@ -720,4 +761,5 @@ end
     @test test_print_composition()
     @test test_group_eigenvalues()
     @test test_print_composition2()
+    @test test_print_composition_ErIII()
 end
