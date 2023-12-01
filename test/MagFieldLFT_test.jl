@@ -633,14 +633,6 @@ function test_print_composition()
     return printed_string == ref
 end
 
-function test_print_composition2()
-    param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
-    exc = MagFieldLFT.calc_exclists(param)
-    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
-    energies_rel, states_rel = MagFieldLFT.calc_solutions(H_fieldfree)
-    H_nonrel = MagFieldLFT.calc_H_nonrel(param, exc)
-end
-
 function test_group_eigenvalues()
     values = [1,1,2,5,7,7,7,10]
     unique_values, indices = MagFieldLFT.group_eigenvalues(values)
@@ -649,24 +641,37 @@ function test_group_eigenvalues()
     return (unique_values == ref_values) && (indices == ref_indices)
 end
 
-function test_adapt_basis()
+function test_print_composition2()
     param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
     exc = MagFieldLFT.calc_exclists(param)
-    H = Hermitian(MagFieldLFT.calc_H_nonrel(param, exc))
-    Sx, Sy, Sz = MagFieldLFT.calc_S(param.l, exc)
-    S2 = Sx*Sx + Sy*Sy + Sz*Sz
-    vals, vecs = eigen(H)
-    C_list, labels_list = MagFieldLFT.adapt_basis([vecs], [Vector{Float64}(undef, 0)], Hermitian(S2))
-    C_list2, labels_list2 = MagFieldLFT.adapt_basis(C_list, labels_list, Hermitian(Sz))
-    #println(diag(C_list2[1]'*S2*C_list2[1]))
-    #println(diag(C_list2[2]'*S2*C_list2[2]))
-    println(labels_list2[1])
-    println(labels_list2[2])
-    println(labels_list2[3])
-    println(labels_list2[4])
-    return false
+    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
+    energies_rel, states_rel = MagFieldLFT.calc_solutions(H_fieldfree)
+    C_rel_ground = states_rel[:,1]
+    C_rel_first = states_rel[:,2]
+    C_list, labels_list = MagFieldLFT.adapt_basis_Hnonrel_S2_Sz(param)
+    thresh = 0.99
+    buf = IOBuffer()
+    MagFieldLFT.print_composition(C_rel_ground, C_list, labels_list, thresh, buf)
+    printed_string_ground = String(take!(buf))
+    MagFieldLFT.print_composition(C_rel_first, C_list, labels_list, thresh, buf)
+    printed_string_first = String(take!(buf))
+    ref_ground = """
+     45.52%  E = -30.339968, S =  1.0, M_S = -1.0
+     45.52%  E = -30.339968, S =  1.0, M_S =  1.0
+      5.65%  E = -30.339968, S =  1.0, M_S =  0.0
+      0.87%  E = -30.323346, S =  1.0, M_S =  0.0
+      0.84%  E = -30.323346, S =  1.0, M_S = -1.0
+      0.84%  E = -30.323346, S =  1.0, M_S =  1.0
+    """
+    ref_first = """
+     39.81%  E = -30.339968, S =  1.0, M_S =  0.0
+     28.52%  E = -30.339968, S =  1.0, M_S =  1.0
+     28.52%  E = -30.339968, S =  1.0, M_S = -1.0
+      1.26%  E = -30.323346, S =  1.0, M_S =  1.0
+      1.26%  E = -30.323346, S =  1.0, M_S = -1.0
+    """
+    return (ref_ground == printed_string_ground) && (ref_first == printed_string_first)
 end
-
 
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
@@ -714,5 +719,5 @@ end
     @test test_Fderiv4_numeric_vs_analytic_zerofield()
     @test test_print_composition()
     @test test_group_eigenvalues()
-    @test_broken test_adapt_basis()
+    @test test_print_composition2()
 end

@@ -360,6 +360,7 @@ struct ExcitationLists
     beta::Vector{Vector{NTuple{4, Int64}}}
     plus::Vector{Vector{NTuple{4, Int64}}}
     minus::Vector{Vector{NTuple{4, Int64}}}
+    Dim::Int64
 end
 
 """
@@ -386,7 +387,8 @@ function calc_exclists(l::Int, N::Int)
         push!(L_plus, exc_plus)
         push!(L_minus, exc_minus)
     end
-    return ExcitationLists(L_alpha, L_beta, L_plus, L_minus)
+    Dim = length(L_alpha)
+    return ExcitationLists(L_alpha, L_beta, L_plus, L_minus, Dim)
 end
 
 function calc_exclists(param::LFTParam)
@@ -395,9 +397,8 @@ function calc_exclists(param::LFTParam)
 end
 
 function calc_singletop(int::Matrix{T}, exc::ExcitationLists) where T<:Number
-    Dim = length(exc.alpha)
-    H_single = convert(T, 0) * zeros(Dim, Dim)   # zero matrix with same type as int
-    for J in 1:Dim
+    H_single = convert(T, 0) * zeros(exc.Dim, exc.Dim)   # zero matrix with same type as int
+    for J in 1:exc.Dim
         for (Ii,pi,qi,gammai) in exc.alpha[J]
             H_single[Ii,J] += int[pi,qi]*gammai
         end
@@ -409,11 +410,10 @@ function calc_singletop(int::Matrix{T}, exc::ExcitationLists) where T<:Number
 end
 
 function calc_double_exc(ERIs::Array{Float64, 4}, exc::ExcitationLists)
-    Dim = length(exc.alpha)
     norb = size(ERIs)[1]
-    H_double = zeros(Dim, Dim)
-    for K in 1:Dim
-        X = zeros(Dim, norb, norb)
+    H_double = zeros(exc.Dim, exc.Dim)
+    for K in 1:exc.Dim
+        X = zeros(exc.Dim, norb, norb)
         for p in 1:norb, q in 1:norb
             for (Ii,pi,qi,gammai) in exc.alpha[K]
                 X[Ii,p,q] += ERIs[p,q,qi,pi] * gammai
@@ -422,7 +422,7 @@ function calc_double_exc(ERIs::Array{Float64, 4}, exc::ExcitationLists)
                 X[Ii,p,q] += ERIs[p,q,qi,pi] * gammai
             end
         end
-        for J in 1:Dim
+        for J in 1:exc.Dim
             for (Ii,pi,qi,gammai) in exc.alpha[K]
                 H_double[Ii, J] += 0.5*gammai*X[J,pi,qi]
             end
@@ -455,10 +455,9 @@ l: angular momentum of partially filled shell
 exc: Lists of excitations and coupling coefficients.
 """
 function calc_SOC(SOCints::NTuple{3, Matrix{ComplexF64}}, exc::ExcitationLists)
-    Dim = length(exc.alpha)
-    H_SOC = im*zeros(Dim, Dim)
+    H_SOC = im*zeros(exc.Dim, exc.Dim)
     SOCz, SOCplus, SOCminus = SOCints
-    for J in 1:Dim
+    for J in 1:exc.Dim
         for (Ii,pi,qi,gammai) in exc.minus[J]
             H_SOC[Ii,J] += 0.5*SOCplus[pi,qi]*gammai
         end
@@ -1002,7 +1001,7 @@ matrices U. This is used if some labels are used for whole groups of basis vecto
 we want to print the percentage of a certain total spin).
 """
 function print_composition(C::Vector{T1}, U_list::Vector{Matrix{T2}}, labels::Vector{String}, thresh::Number=0.98, io::IO=stdout) where {T1 <: Number, T2 <: Number}
-    percentages = [C'*U*U'*C for U in U_list]
+    percentages = [real(C'*U*U'*C) for U in U_list]
     p = sortperm(percentages, rev=true)
     percentages_sorted = percentages[p]
     labels_sorted = labels[p]
@@ -1013,28 +1012,6 @@ function print_composition(C::Vector{T1}, U_list::Vector{Matrix{T2}}, labels::Ve
         total_percentage += percentages_sorted[i]
         i += 1
     end
-end
-
-function get_basis_nonrelstates(param)
-    norb = size(param.hLFT)[1]
-    l = (norb-1)÷2
-    exc = calc_exclists(l,param.nel)
-    return get_basis_nonrelstates(param, exc)
-end
-
-function get_basis_nonrelstates(param, exc)
-    H = MagFieldLFT.calc_H_nonrel(param, exc)
-    energies, states = calc_solutions(Hermitian(H))
-    norb = size(param.hLFT)[1]
-    l = (norb-1)÷2
-    Sx, Sy, Sz = calc_S(l, exc)
-    S2 = Sx*Sx + Sy*Sy + Sz*Sz
-
-    S2_eigenbasis = real(diag(states'*S2*states))
-    Sz_eigenbasis = real(diag(states'*Sz*states))
-    println(energies)
-    println(S2_eigenbasis)
-    println(Sz_eigenbasis)
 end
 
 """
@@ -1077,6 +1054,22 @@ function adapt_basis(C_list::Vector{Matrix{T1}}, labels_list::Vector{Vector{Floa
         end
     end
     return C_list_new, labels_list_new
+end
+
+function prettylabels_Hnonrel_S2_Sz(labels_list::Vector{Vector{Float64}})
+    return [@sprintf("E = %10.6f, S = %4.1f, M_S = %4.1f", l[1], sqrt(l[2]+0.25)-0.5, l[3]) for l in labels_list]
+end
+
+function adapt_basis_Hnonrel_S2_Sz(param::LFTParam)
+    exc = calc_exclists(param.l,param.nel)
+    Hnonrel = MagFieldLFT.calc_H_nonrel(param, exc)
+    Sx, Sy, Sz = calc_S(param.l, exc)
+    S2 = Sx*Sx + Sy*Sy + Sz*Sz
+    C_list1, labels_list1 = adapt_basis([Matrix{Float64}(1.0I, exc.Dim, exc.Dim)], [Vector{Float64}(undef, 0)], Hermitian(Hnonrel))
+    C_list2, labels_list2 = adapt_basis(C_list1, labels_list1, Hermitian(S2))
+    C_list3, labels_list3 = adapt_basis(C_list2, labels_list2, Hermitian(Sz))
+    str_labels_list3 = prettylabels_Hnonrel_S2_Sz(labels_list3)
+    return C_list3, str_labels_list3
 end
 
 
