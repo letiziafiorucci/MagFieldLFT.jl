@@ -622,6 +622,98 @@ function rel_diff_norm(value, ref)
 end
 
 
+#at very low magnetic field the field dependent results and the zero field ones should be the same 
+function test_KurlandMcGarvey_ord4_Br_field()
+    bohrinangstrom = 0.529177210903
+    # atom counting starting from 1 (total number of atoms is 49, NH proton is the last one)
+    r_Ni = [0.000,   0.000,   0.000]                      # atom 33
+    r_NH = [0.511,  -2.518,  -0.002]                      # atom 49  NH
+    r_CH1 = [1.053,   1.540,   3.541]                     # atom 23  CH'
+    r_CH2 = [-0.961,  -1.048,  -3.741]                    # atom 32  CH
+    r_alpha1_alpha2prime_1 = [-1.500,  -3.452,   1.130]   # atom 44  alpha1
+    r_alpha1_alpha2prime_2 = [0.430,  -3.104,   2.402]    # atom 45  alpha2'
+    R_NH                   = r_Ni - r_NH
+    R_CH1                  = r_Ni - r_CH1
+    R_CH2                  = r_Ni - r_CH2
+    R_alpha1_alpha2prime_1 = r_Ni - r_alpha1_alpha2prime_1
+    R_alpha1_alpha2prime_2 = r_Ni - r_alpha1_alpha2prime_2
+    R = [R_NH, R_CH1, R_CH2, R_alpha1_alpha2prime_1, R_alpha1_alpha2prime_2] / bohrinangstrom
+
+    param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
+    T = 298. 
+    B0_MHz = 10. 
+    B0 = B0_MHz/42.577478518/2.35051756758e5
+    S = 1.0
+
+    shift_ord4 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, B0)
+    KMcG_shifts = MagFieldLFT.calc_shifts_KurlandMcGarvey(param, R, T)
+    Br_shifts = MagFieldLFT.calc_shifts_KurlandMcGarvey_Br(param, R, T, B0, S)
+
+    return norm(KMcG_shifts - Br_shifts) < 1.0e-4  && norm(KMcG_shifts - shift_ord4) < 1.0e-4
+end
+
+#at very high temperature the difference in field dependent effects simulation should decrease
+#due to the population of all the levels of the ground multiplet  
+function test_KurlandMcGarvey_ord4_Br_temperature()
+    bohrinangstrom = 0.529177210903
+    # atom counting starting from 1 (total number of atoms is 49, NH proton is the last one)
+    r_Ni = [0.000,   0.000,   0.000]                      # atom 33
+    r_NH = [0.511,  -2.518,  -0.002]                      # atom 49  NH
+    r_CH1 = [1.053,   1.540,   3.541]                     # atom 23  CH'
+    r_CH2 = [-0.961,  -1.048,  -3.741]                    # atom 32  CH
+    r_alpha1_alpha2prime_1 = [-1.500,  -3.452,   1.130]   # atom 44  alpha1
+    r_alpha1_alpha2prime_2 = [0.430,  -3.104,   2.402]    # atom 45  alpha2'
+    R_NH                   = r_Ni - r_NH
+    R_CH1                  = r_Ni - r_CH1
+    R_CH2                  = r_Ni - r_CH2
+    R_alpha1_alpha2prime_1 = r_Ni - r_alpha1_alpha2prime_1
+    R_alpha1_alpha2prime_2 = r_Ni - r_alpha1_alpha2prime_2
+    R = [R_NH, R_CH1, R_CH2, R_alpha1_alpha2prime_1, R_alpha1_alpha2prime_2] / bohrinangstrom
+
+    param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
+    T = 400. 
+    B0_MHz = 400. 
+    B0 = B0_MHz/42.577478518/2.35051756758e5
+    S = 1.0
+
+    shift_ord4 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, B0)
+    Br_shifts = MagFieldLFT.calc_shifts_KurlandMcGarvey_Br(param, R, T, B0, S)
+
+    return norm((shift_ord4 - Br_shifts) .* 100 ./ shift_ord4) < 2.0e-2
+end
+
+
+function fielddepshift_cube()
+
+    points = -1.5:0.1:1.5
+
+    meshgrid(xs, ys, zs) = [xs[i] for i in 1:length(xs), j in 1:length(ys), k in 1:length(zs)], [ys[j] for i in 1:length(xs), j in 1:length(ys), k in 1:length(zs)], [zs[k] for i in 1:length(xs), j in 1:length(ys), k in 1:length(zs)]
+    datax, datay, dataz = meshgrid(points, points, points)
+    meta = Dict("xvec" => [1.0 0.0 0.0], "yvec" => [0.0 1.0 0.0], "zvec" => [0.0 0.0 1.0], "atoms" => [(1, 1, [0.0 0.0 0.0])], "org" => [0.0 0.0 0.0])
+
+    param = read_AILFT_params_ORCA("MagFieldLFT.jl/test/NiSAL_HDPT.out", "CASSCF")
+    T = 298. 
+    B0_MHz = 400. 
+    B0 = B0_MHz/42.577478518/2.35051756758e5  # from MHz to au
+
+    data = zeros(size(datax))
+    for i in 1:size(datax)[1]
+        for j in 1:size(datax)[2]
+            for k in 1:size(datax)[3]
+                println(i,j,k)
+                matrix = [datax[i,j,k] datay[i,j,k] dataz[i,j,k]]
+                shift0 = MagFieldLFT.calc_shifts_KurlandMcGarvey(param, [vec(matrix)], T)[1]
+                shift1 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, [vec(matrix)], T, B0, false)[1]
+                data[i,j,k] = shift0-shift1
+            end
+        end
+    end
+    MagFieldLFT.write_cube(data, meta, "corrord4_NiSAL.cube")
+
+end
+
+
+
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
     @test test_createSDs2()
@@ -666,4 +758,6 @@ end
     @test test_Fderiv3_numeric_vs_analytic()
     @test test_Fderiv4_numeric_vs_analytic()
     @test test_Fderiv4_numeric_vs_analytic_zerofield()
+    @test test_KurlandMcGarvey_ord4_Br_field()
+    @test test_KurlandMcGarvey_ord4_Br_temperature()
 end
