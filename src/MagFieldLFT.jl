@@ -1,6 +1,6 @@
 module MagFieldLFT
 
-using LinearAlgebra, Permutations, OutputParser, DelimitedFiles
+using LinearAlgebra, Permutations, OutputParser, DelimitedFiles, Printf
 
 export read_AILFT_params_ORCA, LFTParam, lebedev_grids
 
@@ -32,9 +32,18 @@ end
 
 lebedev_grids = setup_Lebedev_grids()
 
+"""
+nel: Number of electrons
+norb: Number of orbitals (=2l+1)
+l: Angular momentum of the open shell (l=2 for d orbitals, l=3 for f orbitals)
+hLFT: One-electron ligand field matrix
+F: Racah parameters
+zeta: Spin-orbit coupling parameter
+"""
 struct LFTParam
     nel::Int64
     norb::Int64
+    l::Int64
     hLFT::Matrix{Float64}
     F::Dict{Int64, Float64}
     zeta::Float64
@@ -351,6 +360,7 @@ struct ExcitationLists
     beta::Vector{Vector{NTuple{4, Int64}}}
     plus::Vector{Vector{NTuple{4, Int64}}}
     minus::Vector{Vector{NTuple{4, Int64}}}
+    Dim::Int64
 end
 
 """
@@ -377,13 +387,18 @@ function calc_exclists(l::Int, N::Int)
         push!(L_plus, exc_plus)
         push!(L_minus, exc_minus)
     end
-    return ExcitationLists(L_alpha, L_beta, L_plus, L_minus)
+    Dim = length(L_alpha)
+    return ExcitationLists(L_alpha, L_beta, L_plus, L_minus, Dim)
+end
+
+function calc_exclists(param::LFTParam)
+    l = (param.norb-1)÷2
+    return calc_exclists(l,param.nel)
 end
 
 function calc_singletop(int::Matrix{T}, exc::ExcitationLists) where T<:Number
-    Dim = length(exc.alpha)
-    H_single = convert(T, 0) * zeros(Dim, Dim)   # zero matrix with same type as int
-    for J in 1:Dim
+    H_single = convert(T, 0) * zeros(exc.Dim, exc.Dim)   # zero matrix with same type as int
+    for J in 1:exc.Dim
         for (Ii,pi,qi,gammai) in exc.alpha[J]
             H_single[Ii,J] += int[pi,qi]*gammai
         end
@@ -395,11 +410,10 @@ function calc_singletop(int::Matrix{T}, exc::ExcitationLists) where T<:Number
 end
 
 function calc_double_exc(ERIs::Array{Float64, 4}, exc::ExcitationLists)
-    Dim = length(exc.alpha)
     norb = size(ERIs)[1]
-    H_double = zeros(Dim, Dim)
-    for K in 1:Dim
-        X = zeros(Dim, norb, norb)
+    H_double = zeros(exc.Dim, exc.Dim)
+    for K in 1:exc.Dim
+        X = zeros(exc.Dim, norb, norb)
         for p in 1:norb, q in 1:norb
             for (Ii,pi,qi,gammai) in exc.alpha[K]
                 X[Ii,p,q] += ERIs[p,q,qi,pi] * gammai
@@ -408,7 +422,7 @@ function calc_double_exc(ERIs::Array{Float64, 4}, exc::ExcitationLists)
                 X[Ii,p,q] += ERIs[p,q,qi,pi] * gammai
             end
         end
-        for J in 1:Dim
+        for J in 1:exc.Dim
             for (Ii,pi,qi,gammai) in exc.alpha[K]
                 H_double[Ii, J] += 0.5*gammai*X[J,pi,qi]
             end
@@ -430,27 +444,31 @@ function calc_H_nonrel(param::LFTParam, exc::ExcitationLists)
     return H_single + H_double
 end
 
+function calc_SOCintegrals(zeta::Float64, l::Int)
+    lz, lplus, lminus = calc_lops_real(l::Int)
+    return zeta*lz, zeta*lplus, zeta*lminus
+end
+
 """
 zeta: SOC parameter
 l: angular momentum of partially filled shell
 exc: Lists of excitations and coupling coefficients.
 """
-function calc_SOC(zeta::Float64, l::Int, exc::ExcitationLists)
-    Dim = length(exc.alpha)
-    H_SOC = im*zeros(Dim, Dim)
-    lz, lplus, lminus = calc_lops_real(l::Int)
-    for J in 1:Dim
+function calc_SOC(SOCints::NTuple{3, Matrix{ComplexF64}}, exc::ExcitationLists)
+    H_SOC = im*zeros(exc.Dim, exc.Dim)
+    SOCz, SOCplus, SOCminus = SOCints
+    for J in 1:exc.Dim
         for (Ii,pi,qi,gammai) in exc.minus[J]
-            H_SOC[Ii,J] += 0.5*zeta*lplus[pi,qi]*gammai
+            H_SOC[Ii,J] += 0.5*SOCplus[pi,qi]*gammai
         end
         for (Ii,pi,qi,gammai) in exc.plus[J]
-            H_SOC[Ii,J] += 0.5*zeta*lminus[pi,qi]*gammai
+            H_SOC[Ii,J] += 0.5*SOCminus[pi,qi]*gammai
         end
         for (Ii,pi,qi,gammai) in exc.alpha[J]
-            H_SOC[Ii,J] += 0.5*zeta*lz[pi,qi]*gammai
+            H_SOC[Ii,J] += 0.5*SOCz[pi,qi]*gammai
         end
         for (Ii,pi,qi,gammai) in exc.beta[J]
-            H_SOC[Ii,J] -= 0.5*zeta*lz[pi,qi]*gammai
+            H_SOC[Ii,J] -= 0.5*SOCz[pi,qi]*gammai
         end
     end
     return H_SOC
@@ -459,7 +477,8 @@ end
 function calc_H_fieldfree(param::LFTParam, exc::ExcitationLists)
     norb = size(param.hLFT)[1]
     l = (norb-1)÷2
-    H_fieldfree = calc_H_nonrel(param, exc) + calc_SOC(param.zeta, l, exc)
+    SOCints = calc_SOCintegrals(param.zeta, l)
+    H_fieldfree = calc_H_nonrel(param, exc) + calc_SOC(SOCints, exc)
     return Hermitian(H_fieldfree)
 end
 
@@ -507,6 +526,7 @@ TO DO: extend for f elements and for SOC parameter.
 function read_AILFT_params_ORCA(outfile::String, method::String)
     nel = parse_int(outfile, ["nel"], 0, 3)
     norb = parse_int(outfile, ["norb"], 0, 3)
+    l = (norb-1)÷2
     if norb == 5
         hLFT = Matrix{Float64}(undef, norb, norb)
         for row in 1:norb
@@ -538,10 +558,10 @@ function read_AILFT_params_ORCA(outfile::String, method::String)
         F = Dict(0 => F0, 2 => F2/15/15, 4 => F4/33/33, 6 => (5/429)^2 * F6)
         zeta = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "ZETA_F"], 0, 2)/219474.63  # convert from cm-1 to Hartree
     end
-    return LFTParam(nel, norb, hLFT, F, zeta)
+    return LFTParam(nel, norb, l, hLFT, F, zeta)
 end
 
-const HermMat = Hermitian{ComplexF64, Matrix{ComplexF64}}   # Complex hermitian matrix
+const HermMat = Hermitian{T, Matrix{T}} where T <: Number  # Complex hermitian (or real symmetric) matrix
 
 function calc_H_magfield(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64})
     H_magfield = H_fieldfree + 0.5*(L[1]*B[1] + L[2]*B[2] + L[3]*B[3]) + S[1]*B[1] + S[2]*B[2] + S[3]*B[3]
@@ -581,7 +601,7 @@ end
 
 """
 H_fieldfree: Hamiltonian in the absence of a magnetic field
-H: Hamiltonian whose eigenstates and eigenenergies we want to calculate (relative to fieldfree E0)
+H: Hamiltonian whose eigenstates and eigenenergies we want to calculate (relative to fieldfree ground state energy E0)
 """
 function calc_solutions(H_fieldfree::HermMat, H::HermMat)
     E0 = fieldfree_GS_energy(H_fieldfree)
@@ -963,6 +983,165 @@ function MHz2au(nu::Real)
     return Tesla2au(MHz2Tesla(nu))
 end
 
+"""
+C: Coefficients of the state in the Slater determinant basis
+U: Matrix whose columns are coefficients of basis states in the Slater determinant basis.
+   This matrix must be unitary, i.e., the basis must be orthonormal!
+labels: Unique identifiers for the basis states (e.g. quantum numbers)
+thresh: Total percentage to which the printed contributions must at least sum up to (default: 0.98)
+"""
+function print_composition(C::Vector{T1}, U::Matrix{T2}, labels::Vector{String}, thresh::Number=0.98, io::IO=stdout) where {T1 <: Number, T2 <: Number}
+    U_list = [U[:,i:i] for i in 1:size(U)[2]]
+    print_composition(C, U_list, labels, thresh, io)
+end
+
+"""
+Same as before, but now you don't pass a square matrix U with basis vectors, but a list of (in general rectangular)
+matrices U. This is used if some labels are used for whole groups of basis vectors (e.g., if
+we want to print the percentage of a certain total spin).
+"""
+function print_composition(C::Vector{T1}, U_list::Vector{Matrix{T2}}, labels::Vector{String}, thresh::Number=0.99, io::IO=stdout) where {T1 <: Number, T2 <: Number}
+    percentages = [real(C'*U*U'*C) for U in U_list]
+    p = sortperm(percentages, rev=true)
+    percentages_sorted = percentages[p]
+    labels_sorted = labels[p]
+    total_percentage = 0.0
+    i = 1
+    while total_percentage < thresh
+        @printf(io, "%6.2f%%  %s\n", percentages_sorted[i]*100, labels_sorted[i])
+        total_percentage += percentages_sorted[i]
+        i += 1
+    end
+end
+
+"""
+This function assumes that the eigenvalues are sorted (i.e., equal eigenvalues have neighboring indices)
+"""
+function group_eigenvalues(values::Vector{T}, thresh::Real=1.0e-8) where T<:Real
+    indices = Vector{Vector{Int64}}(undef, 0)
+    unique_values = Vector{T}(undef, 0)
+    current_value = values[1]
+    current_indices = [1]
+    for i in 2:length(values)
+        if abs(values[i] - current_value) < thresh
+            push!(current_indices, i)
+        else
+            push!(indices, current_indices)
+            push!(unique_values, current_value)
+            current_indices = [i]
+            current_value = values[i]
+        end
+    end
+    push!(indices, current_indices)
+    push!(unique_values, current_value)
+    return unique_values, indices
+end
+
+function adapt_basis(C_list::Vector{Matrix{T1}}, labels_list::Vector{Vector{Float64}}, op::HermMat) where {T1<:Number}
+    C_list_new = Vector{Matrix{ComplexF64}}(undef, 0)
+    labels_list_new = Vector{Vector{Float64}}(undef, 0)
+    for i in 1:length(C_list)
+        C = C_list[i]
+        op_C = Hermitian(C'*op*C)
+        vals, vecs = eigen(op_C)
+        unique_vals, indices = group_eigenvalues(vals)
+        for j in 1:length(unique_vals)
+            V = vecs[:, indices[j]]
+            labels = deepcopy(labels_list[i])
+            push!(labels, unique_vals[j])
+            push!(C_list_new, C*V)
+            push!(labels_list_new, labels)
+        end
+    end
+    return C_list_new, labels_list_new
+end
+
+"""
+Turn a value that might almost be integer or half-integer into one that is exactly integer or half-integer.
+Type of returned value: Float64
+"""
+function exactspinQN(value::Real)
+    return round(2*value+1e-10)/2     # add small number before rounding to always get 0.0 instead of -0.0
+end
+
+"""
+Given an eigenvalue of a squared angular momentum operator J2, i.e. value = J(J+1),
+return the corresponding total angular momentum quantum number J.
+"""
+function J2_to_J(value::Real)
+    J = sqrt(value+0.25)-0.5
+    return exactspinQN(J)
+end
+
+function prettylabels_Hnonrel_S2_Sz(labels_list::Vector{Vector{Float64}})
+    return [@sprintf("E = %10.6f, S = %4.1f, M_S = %4.1f", l[1], J2_to_J(l[2]), exactspinQN(l[3])) for l in labels_list]
+end
+
+function adapt_basis_Hnonrel_S2_Sz(param::LFTParam)
+    exc = calc_exclists(param.l,param.nel)
+    Hnonrel = MagFieldLFT.calc_H_nonrel(param, exc)
+    Sx, Sy, Sz = calc_S(param.l, exc)
+    S2 = Sx*Sx + Sy*Sy + Sz*Sz
+    C_list1, labels_list1 = adapt_basis([Matrix{Float64}(1.0I, exc.Dim, exc.Dim)], [Vector{Float64}(undef, 0)], Hermitian(Hnonrel))
+    C_list2, labels_list2 = adapt_basis(C_list1, labels_list1, Hermitian(S2))
+    C_list3, labels_list3 = adapt_basis(C_list2, labels_list2, Hermitian(Sz))
+    str_labels_list3 = prettylabels_Hnonrel_S2_Sz(labels_list3)
+    return C_list3, str_labels_list3
+end
+
+term_sym = Dict(0 => "S",
+                1 => "P",
+                2 => "D",
+                3 => "F",
+                4 => "G",
+                5 => "H",
+                6 => "I",
+                7 => "J",
+                8 => "K",
+                9 => "L",
+                10 => "M")
+
+function spinQNlabel(S::Real)
+    if abs(S-round(S)) < 1e-10
+        label = "$(Int64(round(S)))"
+    elseif abs(2S-round(2S)) < 1e-10
+        numerator = Int64(round(2S))
+        label = "$(numerator)/2"
+    else
+        println(S)
+        error("Spin quantum number may only take integer or half-integer values!")
+    end
+    return label
+end
+
+"""
+format: How are the states labeled. Default: "QN" (quantum numbers). Other option: "term_symbols".
+"""
+function prettylabels_L2_S2_J2_Jz(labels_list::Vector{Vector{Float64}}, format::String="QN")
+    if format == "QN"
+        return [@sprintf("(L, S, J, M_J) = (%4.1f,%4.1f,%4.1f,%4.1f)", J2_to_J(l[1]), J2_to_J(l[2]), J2_to_J(l[3]), exactspinQN(l[4])) for l in labels_list]
+    elseif format == "term_symbols"
+        return [@sprintf("Term: %d%s%s, M_J = %s", Int(round(2*J2_to_J(l[2])+1)), term_sym[Int(round(J2_to_J(l[1])))], spinQNlabel(J2_to_J(l[3])), spinQNlabel(l[4])) for l in labels_list]
+    end
+end
+
+function adapt_basis_L2_S2_J2_Jz(param::LFTParam, format::String="QN")
+    exc = calc_exclists(param.l,param.nel)
+    Sx, Sy, Sz = calc_S(param.l, exc)
+    Lx, Ly, Lz = calc_L(param.l, exc)
+    Jx = Lx+Sx
+    Jy = Ly+Sy
+    Jz = Lz+Sz
+    S2 = Sx*Sx + Sy*Sy + Sz*Sz
+    L2 = Lx*Lx + Ly*Ly + Lz*Lz
+    J2 = Jx*Jx + Jy*Jy + Jz*Jz
+    C_list1, labels_list1 = adapt_basis([Matrix{Float64}(1.0I, exc.Dim, exc.Dim)], [Vector{Float64}(undef, 0)], Hermitian(L2))
+    C_list2, labels_list2 = adapt_basis(C_list1, labels_list1, Hermitian(S2))
+    C_list3, labels_list3 = adapt_basis(C_list2, labels_list2, Hermitian(J2))
+    C_list4, labels_list4 = adapt_basis(C_list3, labels_list3, Hermitian(Jz))
+    str_labels_list4 = prettylabels_L2_S2_J2_Jz(labels_list4, format)
+    return C_list4, str_labels_list4
+end
 
 function Brillouin(S::Float64, T::Float64, B0::Float64)
     #B0 in au

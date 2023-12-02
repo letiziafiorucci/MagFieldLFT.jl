@@ -167,7 +167,7 @@ function test_calc_H_nonrel1()
     norb = 2l+1
     hLFT = zeros(norb,norb)
     F = Dict(0 => 1.0, 2 => 2.0)
-    param = LFTParam(N, norb, hLFT, F, 0.0)
+    param = LFTParam(N, norb, l, hLFT, F, 0.0)
     H = MagFieldLFT.calc_H_nonrel(param, exc)
     E = eigvals(H)
     return E[1]≈-9 && E[9]≈-9 && E[10]≈3 && E[14]≈3 && E[15]≈21
@@ -192,7 +192,7 @@ function test_calc_H_nonrel2()
     B = 2
     C = 4
     F = MagFieldLFT.Racah2F(A,B,C)
-    param = LFTParam(N, norb, hLFT, F, 0.0)
+    param = LFTParam(N, norb, l, hLFT, F, 0.0)
     H = MagFieldLFT.calc_H_nonrel(param, exc)
     E = eigvals(H)
     return E[1]≈-15 && E[22]≈3 && E[27]≈15 && E[36]≈17 && E[45]≈57
@@ -209,7 +209,7 @@ function test_calc_H_fieldfree()
     C = 4
     F = MagFieldLFT.Racah2F(A,B,C)
     zeta = 0.5
-    param = LFTParam(N, norb, hLFT, F, zeta)
+    param = LFTParam(N, norb, l, hLFT, F, zeta)
     H = MagFieldLFT.calc_H_fieldfree(param, exc)
     E = eigvals(H)
     return E[1]≈E[5] && E[6]≈E[12] && E[13]≈E[21] && !(E[1]≈E[6]) && !(E[6]≈E[13])
@@ -229,7 +229,7 @@ function test_calc_L()
     B = 2
     C = 4
     F = MagFieldLFT.Racah2F(A,B,C)
-    param = LFTParam(N, norb, hLFT, F, 0.0)
+    param = LFTParam(N, norb, l, hLFT, F, 0.0)
     H = MagFieldLFT.calc_H_nonrel(param, exc)
     C = eigvecs(H)
     Lx, Ly, Lz = MagFieldLFT.calc_L(l, exc)
@@ -252,7 +252,7 @@ function test_calc_S()
     B = 2
     C = 4
     F = MagFieldLFT.Racah2F(A,B,C)
-    param = LFTParam(N, norb, hLFT, F, 0.0)
+    param = LFTParam(N, norb, l, hLFT, F, 0.0)
     H = MagFieldLFT.calc_H_nonrel(param, exc)
     C = eigvecs(H)
     Sx, Sy, Sz = MagFieldLFT.calc_S(l, exc)
@@ -276,7 +276,7 @@ function test_total_J()
     C = 4
     F = MagFieldLFT.Racah2F(A,B,C)
     zeta = 0.5
-    param = LFTParam(N, norb, hLFT, F, zeta)
+    param = LFTParam(N, norb, l, hLFT, F, zeta)
     H = MagFieldLFT.calc_H_fieldfree(param, exc)
     C = eigvecs(H)
     Lx, Ly, Lz = MagFieldLFT.calc_L(l, exc)
@@ -291,8 +291,7 @@ end
 
 function test_read_AILFT_params_ORCA()
     param = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
-    l=(param.norb-1)÷2
-    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    exc = MagFieldLFT.calc_exclists(param)
     H = MagFieldLFT.calc_H_nonrel(param, exc)
     E = eigvals(H)
     E = (E .- E[1])*27.211    # take ground state energy as reference and convert to eV
@@ -312,8 +311,7 @@ end
 # TO DO: change later.
 function test_Ercomplex()
     param = read_AILFT_params_ORCA("ErCl63-.out", "CASSCF")
-    l=(param.norb-1)÷2
-    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    exc = MagFieldLFT.calc_exclists(param)
     H = MagFieldLFT.calc_H_nonrel(param, exc)
     E = eigvals(H)
     E = (E .- E[1])*27.211  # take ground state energy as reference and convert to eV
@@ -325,8 +323,7 @@ end
 
 function test_Ercomplex_SOC()
     param = read_AILFT_params_ORCA("ErCl63-.out", "CASSCF")
-    l=(param.norb-1)÷2
-    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    exc = MagFieldLFT.calc_exclists(param)
     H = MagFieldLFT.calc_H_fieldfree(param, exc)
     E = eigvals(H)
     E = (E .- E[1])*219474.63  # take ground state energy as reference and convert to cm-1
@@ -338,11 +335,10 @@ end
 
 function test_calc_free_energy()
     param = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
-    l=(param.norb-1)÷2
-    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    exc = MagFieldLFT.calc_exclists(param)
     H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
-    S = MagFieldLFT.calc_S(l, exc)
-    L = MagFieldLFT.calc_L(l, exc)
+    S = MagFieldLFT.calc_S(param.l, exc)
+    L = MagFieldLFT.calc_L(param.l, exc)
     B = [0.0, 0.0, 1.0e-5]
     T = 298.0
     F1 = MagFieldLFT.calc_free_energy(H_fieldfree, L, S, B, T)
@@ -351,11 +347,10 @@ end
 
 function test_average_magnetic_moment()
     param = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
-    l=(param.norb-1)÷2
-    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    exc = MagFieldLFT.calc_exclists(param)
     H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
-    S = MagFieldLFT.calc_S(l, exc)
-    L = MagFieldLFT.calc_L(l, exc)
+    S = MagFieldLFT.calc_S(param.l, exc)
+    L = MagFieldLFT.calc_L(param.l, exc)
     B0_mol = [0.0, 0.0, 0.0]
     T = 298.0
     energies, states = MagFieldLFT.calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
@@ -368,11 +363,10 @@ end
 # At low temperature, magnetization should be that of the ground state (approximately MS=-3/2)
 function test_average_magnetic_moment2()
     param = read_AILFT_params_ORCA("CrF63-.out", "CASSCF")
-    l=(param.norb-1)÷2
-    exc = MagFieldLFT.calc_exclists(l,param.nel)
+    exc = MagFieldLFT.calc_exclists(param)
     H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
-    S = MagFieldLFT.calc_S(l, exc)
-    L = MagFieldLFT.calc_L(l, exc)
+    S = MagFieldLFT.calc_S(param.l, exc)
+    L = MagFieldLFT.calc_L(param.l, exc)
     B0_mol = [0.0, 0.0, 1.0e-4]
     T = 1.0
     energies, states = MagFieldLFT.calc_solutions_magfield(H_fieldfree, L, S, B0_mol)
@@ -386,10 +380,11 @@ end
 function test_average_magnetic_moment3()
     nel = 9
     norb = 5
+    l = 2
     hLFT = diagm([0.3, 0.05, 0.0, 0.05, 0.1])   # energies of x2-y2, xz, z2, yz, xy
     F = Dict(0 => 0.0, 2 => 0.0, 4 => 0.0)    # does not matter for d9 system
     zeta = 0.0
-    param = MagFieldLFT.LFTParam(nel, norb, hLFT, F, zeta)
+    param = MagFieldLFT.LFTParam(nel, norb, l, hLFT, F, zeta)
 
     T = 0.0001
     B0_mol = [0, 0, 1.0e-7]
@@ -621,6 +616,103 @@ function rel_diff_norm(value, ref)
     return norm(value-ref)/norm(ref)
 end
 
+function test_print_composition()
+    C = [1,2,3]
+    C = C/norm(C) # normalize
+    U = [1 0 0; 0 1 0; 0 0 1]
+    labels = ["ex", "ey", "ez"]
+    thresh = 0.98
+    buf = IOBuffer()
+    MagFieldLFT.print_composition(C, U, labels, thresh, buf)
+    printed_string = String(take!(buf))
+    ref = """
+     64.29%  ez
+     28.57%  ey
+      7.14%  ex
+    """
+    return printed_string == ref
+end
+
+function test_group_eigenvalues()
+    values = [1,1,2,5,7,7,7,10]
+    unique_values, indices = MagFieldLFT.group_eigenvalues(values)
+    ref_values = [1,2,5,7,10]
+    ref_indices = [[1,2], [3], [4], [5,6,7], [8]]
+    return (unique_values == ref_values) && (indices == ref_indices)
+end
+
+function test_print_composition2()
+    param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
+    exc = MagFieldLFT.calc_exclists(param)
+    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
+    energies_rel, states_rel = MagFieldLFT.calc_solutions(H_fieldfree)
+    C_rel_ground = states_rel[:,1]
+    C_rel_first = states_rel[:,2]
+    C_list, labels_list = MagFieldLFT.adapt_basis_Hnonrel_S2_Sz(param)
+    thresh = 0.99
+    buf = IOBuffer()
+    MagFieldLFT.print_composition(C_rel_ground, C_list, labels_list, thresh, buf)
+    printed_string_ground = String(take!(buf))
+    MagFieldLFT.print_composition(C_rel_first, C_list, labels_list, thresh, buf)
+    printed_string_first = String(take!(buf))
+    ref_ground = """
+     45.52%  E = -30.339968, S =  1.0, M_S = -1.0
+     45.52%  E = -30.339968, S =  1.0, M_S =  1.0
+      5.65%  E = -30.339968, S =  1.0, M_S =  0.0
+      0.87%  E = -30.323346, S =  1.0, M_S =  0.0
+      0.84%  E = -30.323346, S =  1.0, M_S = -1.0
+      0.84%  E = -30.323346, S =  1.0, M_S =  1.0
+    """
+    ref_first = """
+     39.81%  E = -30.339968, S =  1.0, M_S =  0.0
+     28.52%  E = -30.339968, S =  1.0, M_S =  1.0
+     28.52%  E = -30.339968, S =  1.0, M_S = -1.0
+      1.26%  E = -30.323346, S =  1.0, M_S =  1.0
+      1.26%  E = -30.323346, S =  1.0, M_S = -1.0
+    """
+    return (ref_ground == printed_string_ground) && (ref_first == printed_string_first)
+end
+
+function test_print_composition_ErIII()
+    param = read_AILFT_params_ORCA("ErCl63-.out", "CASSCF")
+    exc = MagFieldLFT.calc_exclists(param)
+    H_fieldfree = MagFieldLFT.calc_H_fieldfree(param, exc)
+    energies_rel, states_rel = MagFieldLFT.calc_solutions(H_fieldfree)
+    C_rel_ground = states_rel[:,1]
+    C_list, labels_list = MagFieldLFT.adapt_basis_L2_S2_J2_Jz(param)
+    C_list_alt, labels_list_alt = MagFieldLFT.adapt_basis_L2_S2_J2_Jz(param, "term_symbols")
+    thresh = 0.99
+    buf = IOBuffer()
+    MagFieldLFT.print_composition(C_rel_ground, C_list, labels_list, thresh, buf)
+    printed_string_ground = String(take!(buf))
+    MagFieldLFT.print_composition(C_rel_ground, C_list_alt, labels_list_alt, thresh, buf)
+    printed_string_ground_alt = String(take!(buf))
+    ref_ground = """
+     29.73%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 2.5)
+     27.25%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 6.5)
+     16.29%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-1.5)
+      8.18%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-5.5)
+      6.06%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-2.5)
+      5.62%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-6.5)
+      3.34%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 1.5)
+      1.59%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 5.5)
+      0.57%  (L, S, J, M_J) = ( 7.0, 0.5, 7.5, 2.5)
+      0.53%  (L, S, J, M_J) = ( 7.0, 0.5, 7.5, 6.5)
+    """
+    ref_ground_alt = """
+     29.73%  Term: 4I15/2, M_J = 5/2
+     27.25%  Term: 4I15/2, M_J = 13/2
+     16.29%  Term: 4I15/2, M_J = -3/2
+      8.18%  Term: 4I15/2, M_J = -11/2
+      6.06%  Term: 4I15/2, M_J = -5/2
+      5.62%  Term: 4I15/2, M_J = -13/2
+      3.34%  Term: 4I15/2, M_J = 3/2
+      1.59%  Term: 4I15/2, M_J = 11/2
+      0.57%  Term: 2J15/2, M_J = 5/2
+      0.53%  Term: 2J15/2, M_J = 13/2
+    """
+    return (ref_ground == printed_string_ground) && (ref_ground_alt == printed_string_ground_alt)
+end
 
 #at very low magnetic field the field dependent results and the zero field ones should be the same 
 function test_KurlandMcGarvey_ord4_Br_field()
@@ -760,4 +852,8 @@ end
     @test test_Fderiv4_numeric_vs_analytic_zerofield()
     @test test_KurlandMcGarvey_ord4_Br_field()
     @test test_KurlandMcGarvey_ord4_Br_temperature()
+    @test test_print_composition()
+    @test test_group_eigenvalues()
+    @test test_print_composition2()
+    @test test_print_composition_ErIII()
 end
