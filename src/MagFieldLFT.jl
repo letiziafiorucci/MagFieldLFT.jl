@@ -1263,6 +1263,84 @@ function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float6
 end
 
 
+function calc_contactshift_fieldindep(param::LFTParam, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real)
+    exc = calc_exclists(param)
+    Sx, Sy, Sz = calc_S(param.l, exc)
+    S = cat(Sx, Sy, Sz; dims=3)
+
+    StDS = sum(D[i, j] * S[:, :, i] * S[:, :, j] for i in 1:3, j in 1:3)
+
+    solution = eigen(StDS)
+    energies = solution.values
+    states = solution.vectors
+
+    Hderiv = [Sx, Sy, Sz]
+
+    SS = calc_F_deriv2(energies, states, Hderiv, T)
+    sigma1 = zeros(length(Aiso), 3, 3)
+
+    shiftcon = Float64[]
+
+    for (i, Aiso_val) in enumerate(Aiso)
+        Aiso_au = MHz2au(Aiso_val)
+
+        for l in 1:3, k in 1:3, o in 1:3, p in 1:3
+            if k == p
+                sigma1[i, l, k] += (1/2) * g[l, o] * Aiso_au * SS[o, p]
+            end
+        end
+
+        con = -1/3 * tr(sigma1[i, :, :]) * 1e6
+        push!(shiftcon, con)
+    end
+
+    return shiftcon
+end
+
+
+
+function calc_contactshift_fielddep(param::LFTParam, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64)
+    exc = calc_exclists(param)
+    Sx, Sy, Sz = calc_S(param.l, exc)
+    S = cat(Sx, Sy, Sz; dims=3)
+
+    StDS = sum(D[i, j] * S[:, :, i] * S[:, :, j] for i in 1:3, j in 1:3)
+
+    solution = eigen(StDS)
+    energies = solution.values
+    states = solution.vectors
+
+    Hderiv = [Sx, Sy, Sz]
+
+    SS = calc_F_deriv2(energies, states, Hderiv, T)
+    sigma1 = zeros(length(Aiso), 3, 3)
+
+    SSSS = calc_F_deriv4(energies, states, Hderiv, T)
+    sigma3 = zeros(length(Aiso), 3, 3, 3, 3)
+
+    shiftcon = Float64[]
+
+    for (i, Aiso_val) in enumerate(Aiso)
+        Aiso_au = MHz2au(Aiso_val)
+
+        for l in 1:3, m in 1:3, n in 1:3, k in 1:3, o in 1:3, p in 1:3, q in 1:3, r in 1:3
+            if k == p && m == 1 && n == 1 && q == 1 && r == 1
+                sigma1[i, l, k] += (1/2) * g[l, o] * Aiso_au * SS[o, p]
+            end
+
+            if k == r
+                sigma3[i, l, m, n, k] += (1/8) * g[l, o] * g[m, p] * g[n, q] * Aiso_au * SSSS[o, p, q, r]
+            end
+        end
+
+        con = -1/3 * tr(sigma1[i, :, :]) * 1e6 - 1/30 * trace_ord2(sigma3[i, :, :, :, :]) * B0^2 * 1e6
+        push!(shiftcon, con)
+    end
+
+    return shiftcon
+end
+
+
 function putline(args::Vararg{Any})
 
     s = string(rpad(args[1], 8, ' '))
@@ -1300,8 +1378,9 @@ function write_cube(data, meta, fname)
                     if (i ≠ 1 || j ≠ 1 || k ≠ 1) && k % 6 == 1
                         write(cube, "\n")
                     end
-                    write(cube, string(data[i, j, k]))
-                    write(cube, "  ")
+                    # write(cube, string(data[i, j, k]))
+                    # write(cube, "  ")
+                    write(cube, " $(@sprintf(" %.5E", data[i, j, k]))")
                 end
             end
         end
