@@ -773,6 +773,7 @@ function determine_degenerate_sets(energies::Vector{Float64})
             current_states = [i]
         end
     end
+    push!(degenerate_sets, DegenerateSet(current_energy, current_states))
     return degenerate_sets
 end
 
