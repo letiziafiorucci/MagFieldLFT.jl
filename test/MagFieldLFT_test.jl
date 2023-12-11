@@ -448,6 +448,19 @@ function test_determine_degenerate_sets()
     return passed
 end
 
+function test_determine_degenerate_sets2()
+    energies = zeros(5)
+    degenerate_sets = MagFieldLFT.determine_degenerate_sets(energies)
+    D = MagFieldLFT.DegenerateSet
+    ref = [D(0.0, [1,2,3,4,5])]
+    passed = true
+    for i in 1:length(degenerate_sets)
+        passed = passed && (degenerate_sets[i].E == ref[i].E)
+        passed = passed && (degenerate_sets[i].states == ref[i].states)
+    end
+    return passed
+end
+
 # in weak-field / high-temperature limit, finite-field magnetization should be linear in external field
 function test_calc_susceptibility_vanVleck()
     param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
@@ -879,6 +892,7 @@ end
     @test test_dipole_matrix()
     @test test_dipole_field()
     @test test_determine_degenerate_sets()
+    @test test_determine_degenerate_sets2()
     @test test_calc_susceptibility_vanVleck()
     @test test_KurlandMcGarvey()
     @test test_KurlandMcGarvey_vs_finitefield()
