@@ -1096,10 +1096,16 @@ term_sym = Dict(0 => "S",
                 4 => "G",
                 5 => "H",
                 6 => "I",
-                7 => "J",
-                8 => "K",
-                9 => "L",
-                10 => "M")
+                7 => "K",
+                8 => "L",
+                9 => "M",
+                10 => "N",
+                11 => "O",
+                12 => "Q",
+                13 => "R",
+                14 => "T",
+                15 => "U",
+                16 => "V")
 
 function spinQNlabel(S::Real)
     if abs(S-round(S)) < 1e-10
@@ -1153,9 +1159,9 @@ function Brillouin(S::Float64, T::Float64, B0::Float64)
 
     B0 *= 2.35051756758e5
 
-    kB = 3/2*k*T /(ge*muB*S*(S+1)*B0)
+    k_B = 3/2*k*T /(ge*muB*S*(S+1)*B0)
     a = muB*ge*B0/(2*k*T)
-    Br = kB*((2*S+1)/tanh((2*S+1)*a) - 1/tanh(a))
+    Br = k_B*((2*S+1)/tanh((2*S+1)*a) - 1/tanh(a))
 
     return Br
 end
@@ -1264,6 +1270,10 @@ end
 
 
 function calc_contactshift_fieldindep(param::LFTParam, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real)
+
+    gammaI = 2.6752e8*1e-6 #MHz/T
+    gammaI *= 2.35051756758e5
+    
     exc = calc_exclists(param)
     Sx, Sy, Sz = calc_S(param.l, exc)
     S = cat(Sx, Sy, Sz; dims=3)
@@ -1277,16 +1287,16 @@ function calc_contactshift_fieldindep(param::LFTParam, Aiso::Matrix{Float64}, g:
     Hderiv = [Sx, Sy, Sz]
 
     SS = calc_F_deriv2(energies, states, Hderiv, T)
+
     sigma1 = zeros(length(Aiso), 3, 3)
 
     shiftcon = Float64[]
 
     for (i, Aiso_val) in enumerate(Aiso)
-        Aiso_au = MHz2au(Aiso_val)
 
         for l in 1:3, k in 1:3, o in 1:3, p in 1:3
             if k == p
-                sigma1[i, l, k] += (1/2) * g[l, o] * Aiso_au * SS[o, p]
+                sigma1[i, l, k] += (1/2) * g[l, o] * (Aiso_val*2pi) *(1/gammaI) * SS[o, p]
             end
         end
 
