@@ -799,7 +799,7 @@ function fielddepshift_cube()
     datax, datay, dataz = meshgrid(points, points, points)
     meta = Dict("xvec" => [1.0 0.0 0.0], "yvec" => [0.0 1.0 0.0], "zvec" => [0.0 0.0 1.0], "atoms" => [(1, 1, [0.0 0.0 0.0])], "org" => [0.0 0.0 0.0])
 
-    param = read_AILFT_params_ORCA("MagFieldLFT.jl/test/NiSAL_HDPT.out", "CASSCF")
+    param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
     T = 298. 
     B0_MHz = 400. 
     B0 = B0_MHz/42.577478518/2.35051756758e5  # from MHz to au
@@ -822,35 +822,33 @@ end
 
 
 function test_calc_contactshift()
+
     from_au = 27.2113834*8065.54477
-    #NiSAL_HDPT.out, from EFFECTIVE HAMILTONIAN SOC CONTRIBUTION
-    D = [3.678836  -7.210809  -21.508915; -7.210809  29.349141  -9.414158; -21.508915  -9.414158  -0.914617]
-    #NiSAL_HDPT.out, 2ND ORDER SPIN-ORBIT COUPLING CONTRIBUTION
-    # D = [  -66.392956    -8.267922   -24.341349 ; -8.267922   -32.532504   -12.388407;  -24.341349   -12.388407   -71.613927]
+    #from calcsuscenisal_10.out casscf effective hamiltonian
+    D = [3.021254 -5.482999 -16.364810; -5.482999 21.938653 -7.107412; -16.364810 -7.107412 -0.931482]
     D /= from_au  #from cm-1 in au
 
-    #Nisalfix_eprnmr.out
-    g = [2.1382738  0.0085116  0.0250705;  0.0074929  2.0932612  0.0112468;  0.0228254  0.0119314  2.1322594]
-    #in MHz (P=533.5514 MHz/au^3)
+    #from calcsuscenisal_10.out casscf effective hamiltonian
+    g = [2.320356 0.036880 0.109631; 0.036810 2.180382 0.053365; 0.109499 0.053077 2.347002]
+    #from Nisalfix_eprnmr.out DFT calc
     Aiso = [-0.2398	0.3677	-0.0953	0.1169	5.6311	0.8206	2.5466	0.9669	2.2237	-0.2058	0.3801	-0.0323	0.0943	5.7383	-0.1162	-0.1048	1.3015	4.0604	3.9516	0.929	-0.1677	-0.2015	-3.5469]
     T = 298.0
 
     B0_MHz = 400. 
     B0 = B0_MHz/42.577478518/2.35051756758e5
 
-    param = read_AILFT_params_ORCA("MagFieldLFT.jl/test/NiSAL_HDPT.out", "CASSCF")
+    shiftcon = MagFieldLFT.calc_contactshift_fieldindep(1, Aiso, g, D, T)
+    # println("fieldindep ",shiftcon)
 
-    shiftcon = MagFieldLFT.calc_contactshift_fieldindep(param, Aiso, g, D, T)
-    println("fieldindep ",shiftcon)
-    #shiftcon = [-13.90810845, 21.326152, -5.527284, 6.780057, 326.596953, 47.593802, 147.69970391, 56.07902447163361, 128.971896491, -11.9361497, 22.045337, -1.87336073, 5.46928535, 332.8144235, -6.73945872, -6.0782725, 75.485417, 235.498263, 229.1879957, 53.8808705, -9.7263961, -11.6867550, -205.71588778]
-    #if I use the D from effective hamiltonian there's a factor 1/2 missing:
-    #shiftcon = [-38.2673354, 58.6776448, -15.207994, 18.654927, 898.61214, 130.951524, 406.38697, 154.29810, 354.8585, -32.841608, 60.65643, -5.154440, 15.048414234313881, 915.71914, -18.5432209, -16.724006487, 207.69364926, 647.9595032, 630.59717, 148.25001933, -26.76160198, -32.1554132, -566.0150630]
-    shiftconB = MagFieldLFT.calc_contactshift_fielddep(param, Aiso, g, D, T, B0)
-    println("fielddep ",shiftconB)
-    println("correction ", shiftcon-shiftconB)
+    indices = [1, 23, 5, 14]
+    calc_shift = [shiftcon[i] for i in indices]
 
-    #values from paper:
-    check = [-17.98026364, 27.57023744, -7.1456177, 8.765191072, 430.2591611, 61.52879207, 190.9447013, 72.49840246,	166.733579,	-15.43093518,	28.49999253, -2.421862033,	7.070637451, 422.2212784,	-8.712704898,	-7.850432038,	97.58679367,	304.4423038,	296.2994487,	69.65665103,	-12.57418771,	-15.10852011,	-265.9474441]
+    #values from high-temperature limit equation (from paper Inorg. Chem. 2021, 60, 3, 2068–2075):
+    # check = [-19.4159467515336, -265.947444074357, 455.934686207511, 464.614375497604]
+    # the difference is due to D contribution 
+    check = [-19.32946495357911, -285.90358316868117, 453.9038786492883, 462.54490718566717]
+
+    return norm(check-calc_shift) < 1e-6
 
 end
 
@@ -907,4 +905,5 @@ end
     @test test_group_eigenvalues()
     @test test_print_composition2()
     @test test_print_composition_ErIII()
+    @test test_calc_contactshift()
 end

@@ -1270,24 +1270,28 @@ function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float6
 end
 
 
-function calc_contactshift_fieldindep(param::LFTParam, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real)
+function calc_contactshift_fieldindep(s::Int, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real)
 
-    gammaI = 2.6752e8*1e-6 #MHz/T
+    gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
     
-    exc = calc_exclists(param)
-    Sx, Sy, Sz = calc_S(param.l, exc)
-    S = cat(Sx, Sy, Sz; dims=3)
+    Sp = MagFieldLFT.calc_lplusminus(s, +1)
+    Sm = MagFieldLFT.calc_lplusminus(s, -1)
+    Sz = MagFieldLFT.calc_lz(s)
 
+    Sx = 0.5 * (Sp + Sm)
+    Sy = -0.5im * (Sp-Sm)
+
+    Hderiv = [Sx, Sy, Sz]
+
+    S = cat(Sx, Sy, Sz; dims=3)
     StDS = sum(D[i, j] * S[:, :, i] * S[:, :, j] for i in 1:3, j in 1:3)
 
     solution = eigen(StDS)
     energies = solution.values
     states = solution.vectors
 
-    Hderiv = [Sx, Sy, Sz]
-
-    SS = calc_F_deriv2(energies, states, Hderiv, T)
+    SS = -calc_F_deriv2(energies, states, Hderiv, T)
 
     sigma1 = zeros(length(Aiso), 3, 3)
 
@@ -1297,7 +1301,7 @@ function calc_contactshift_fieldindep(param::LFTParam, Aiso::Matrix{Float64}, g:
 
         for l in 1:3, k in 1:3, o in 1:3, p in 1:3
             if k == p
-                sigma1[i, l, k] += (1/2) * g[l, o] * (Aiso_val*2pi) *(1/gammaI) * SS[o, p]
+                sigma1[i, l, k] += -(1/2) * g[l, o] * (Aiso_val*2pi) *(1/gammaI) * SS[o, p]
             end
         end
 
@@ -1310,37 +1314,44 @@ end
 
 
 
-function calc_contactshift_fielddep(param::LFTParam, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64)
-    exc = calc_exclists(param)
-    Sx, Sy, Sz = calc_S(param.l, exc)
-    S = cat(Sx, Sy, Sz; dims=3)
+function calc_contactshift_fielddep(s::Int, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64)
 
+    gammaI = 2.6752e8*1e-6 
+    gammaI *= 2.35051756758e5
+
+    Sp = MagFieldLFT.calc_lplusminus(s, +1)
+    Sm = MagFieldLFT.calc_lplusminus(s, -1)
+    Sz = MagFieldLFT.calc_lz(s)
+
+    Sx = 0.5 * (Sp + Sm)
+    Sy = -0.5im * (Sp-Sm)
+
+    Hderiv = [Sx, Sy, Sz]
+
+    S = cat(Sx, Sy, Sz; dims=3)
     StDS = sum(D[i, j] * S[:, :, i] * S[:, :, j] for i in 1:3, j in 1:3)
 
     solution = eigen(StDS)
     energies = solution.values
     states = solution.vectors
 
-    Hderiv = [Sx, Sy, Sz]
-
-    SS = calc_F_deriv2(energies, states, Hderiv, T)
+    SS = -calc_F_deriv2(energies, states, Hderiv, T)
     sigma1 = zeros(length(Aiso), 3, 3)
 
-    SSSS = calc_F_deriv4(energies, states, Hderiv, T)
+    SSSS = -calc_F_deriv4(energies, states, Hderiv, T)
     sigma3 = zeros(length(Aiso), 3, 3, 3, 3)
 
     shiftcon = Float64[]
 
     for (i, Aiso_val) in enumerate(Aiso)
-        Aiso_au = MHz2au(Aiso_val)
 
         for l in 1:3, m in 1:3, n in 1:3, k in 1:3, o in 1:3, p in 1:3, q in 1:3, r in 1:3
             if k == p && m == 1 && n == 1 && q == 1 && r == 1
-                sigma1[i, l, k] += (1/2) * g[l, o] * Aiso_au * SS[o, p]
+                sigma1[i, l, k] += -(1/2) * g[l, o] * (Aiso_val*2pi) * (1/gammaI) * SS[o, p]
             end
 
             if k == r
-                sigma3[i, l, m, n, k] += (1/8) * g[l, o] * g[m, p] * g[n, q] * Aiso_au * SSSS[o, p, q, r]
+                sigma3[i, l, m, n, k] += -(1/8) * g[l, o] * g[m, p] * g[n, q] * (Aiso_val*2pi) *(1/gammaI) * SSSS[o, p, q, r]
             end
         end
 
