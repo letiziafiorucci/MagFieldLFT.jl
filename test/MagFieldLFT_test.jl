@@ -441,7 +441,7 @@ function test_determine_degenerate_sets()
     D = MagFieldLFT.DegenerateSet
     ref = [D(0.0, [1,2,3]), D(2.2, [4,5]), D(2.2+1e-9, [6]), D(7.0, [7]), D(9.0, [8,9,10])]
     passed = true
-    for i in 1:length(degenerate_sets)
+    for i in 1:length(ref)
         passed = passed && (degenerate_sets[i].E == ref[i].E)
         passed = passed && (degenerate_sets[i].states == ref[i].states)
     end
@@ -454,7 +454,7 @@ function test_determine_degenerate_sets2()
     D = MagFieldLFT.DegenerateSet
     ref = [D(0.0, [1,2,3,4,5])]
     passed = true
-    for i in 1:length(degenerate_sets)
+    for i in 1:length(ref)
         passed = passed && (degenerate_sets[i].E == ref[i].E)
         passed = passed && (degenerate_sets[i].states == ref[i].states)
     end
@@ -727,6 +727,7 @@ function test_print_composition_ErIII()
     return (ref_ground == printed_string_ground) && (ref_ground_alt == printed_string_ground_alt)
 end
 
+<<<<<<< HEAD
 #at very low magnetic field the field dependent results and the zero field ones should be the same 
 function test_KurlandMcGarvey_ord4_Br_field()
     bohrinangstrom = 0.529177210903
@@ -854,6 +855,32 @@ end
 
 
 
+=======
+function test_cubicresponse_spin()
+    T = 298.0
+    beta = 1/(MagFieldLFT.kB*T)
+    S = 2
+    Sp = MagFieldLFT.calc_lplusminus(S, +1)
+    Sm = MagFieldLFT.calc_lplusminus(S, -1)
+    Sz = MagFieldLFT.calc_lz(S)
+
+    Sx = 0.5 * (Sp + Sm)
+    Sy = -0.5im * (Sp-Sm)
+    Svec = [Sx, Sy, Sz]
+
+    dim = 2S+1
+    energies = zeros(dim)
+    states = im*Matrix(1.0I, dim, dim)
+    SiSjSkSl = MagFieldLFT.calc_F_deriv4(energies, states, Svec, 298.0)
+    ref = zeros(3,3,3,3)
+    d = Matrix(1.0I, 3, 3)
+    for i in 1:3, j in 1:3, k in 1:3, l in 1:3
+        ref[i,j,k,l] = (beta^3/45)*S*(S+1)*(2S^2+2S+1)*(d[i,j]*d[k,l] + d[i,k]*d[j,l] + d[i,l]*d[j,k])
+    end
+    return norm(SiSjSkSl - ref)/norm(ref) < 1.0e-10
+end
+
+>>>>>>> 73e8501aa45003c75b1a4372b3c827f761819ef3
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
     @test test_createSDs2()
@@ -905,5 +932,9 @@ end
     @test test_group_eigenvalues()
     @test test_print_composition2()
     @test test_print_composition_ErIII()
+<<<<<<< HEAD
     @test test_calc_contactshift()
+=======
+    @test test_cubicresponse_spin()
+>>>>>>> 73e8501aa45003c75b1a4372b3c827f761819ef3
 end

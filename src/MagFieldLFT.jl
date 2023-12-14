@@ -179,6 +179,28 @@ function calc_lplusminus(l::Int, sign::Int)
 end
 
 """
+Calculate sz operator in basis of complex atomic orbitals.
+"""
+calc_sz(l::Float64) = diagm(l:-1:-l)
+
+function calc_splusminus(l::Float64, sign::Int)
+    @assert Int64(abs(sign)) == 1       # sign may only be +1 or -1
+    dim = Int(2l+1)
+    mvalues = l:-1:-l
+    op = zeros(dim,dim)
+    for i_prime in 1:dim
+        m_prime = mvalues[i_prime]
+        for i in 1:dim
+            m = mvalues[i]
+            if m_prime == (m + sign)
+                op[i_prime, i] = sqrt(l*(l+1) - m*(m+sign))
+            end
+        end
+    end
+    return op
+end
+
+"""
 Returns lz, lplus, lminus in basis of complex atomic orbitals of angular momentum l.
 """
 function calc_lops_complex(l::Int)
@@ -1162,7 +1184,11 @@ function Brillouin(S::Float64, T::Float64, B0::Float64)
 
     k_B = 3/2*k*T /(ge*muB*S*(S+1)*B0)
     a = muB*ge*B0/(2*k*T)
-    Br = k_B*((2*S+1)/tanh((2*S+1)*a) - 1/tanh(a))
+    if B0 != 0
+        Br = k_B*((2*S+1)/tanh((2*S+1)*a) - 1/tanh(a))
+    else
+        Br = 1.0
+    end
 
     return Br
 end
@@ -1252,7 +1278,9 @@ function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float6
     #the saturation effect is accounted for with Brillouin equation
 
     Br = Brillouin(S, T, B0)
-    chi = calc_susceptibility_vanVleck(param, T) .* Br
+    chi = calc_susceptibility_vanVleck(param, T)
+    chi *= Br
+
     shifts = Vector{Float64}(undef, 0)
     for Ri in R
         Dip = calc_dipole_matrix(Ri)
@@ -1270,14 +1298,14 @@ function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float6
 end
 
 
-function calc_contactshift_fieldindep(s::Int, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real)
+function calc_contactshift_fieldindep(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real)
 
     gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
     
-    Sp = MagFieldLFT.calc_lplusminus(s, +1)
-    Sm = MagFieldLFT.calc_lplusminus(s, -1)
-    Sz = MagFieldLFT.calc_lz(s)
+    Sp = MagFieldLFT.calc_splusminus(s, +1)
+    Sm = MagFieldLFT.calc_splusminus(s, -1)
+    Sz = MagFieldLFT.calc_sz(s)
 
     Sx = 0.5 * (Sp + Sm)
     Sy = -0.5im * (Sp-Sm)
@@ -1313,15 +1341,67 @@ function calc_contactshift_fieldindep(s::Int, Aiso::Matrix{Float64}, g::Matrix{F
 end
 
 
+function calc_contactshift_fielddep_Br(param::LFTParam, s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, orientation::Bool=false)
 
-function calc_contactshift_fielddep(s::Int, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64)
+    gammaI = 2.6752e8*1e-6 
+    gammaI *= 2.35051756758e5
+    
+    Sp = MagFieldLFT.calc_splusminus(s, +1)
+    Sm = MagFieldLFT.calc_splusminus(s, -1)
+    Sz = MagFieldLFT.calc_sz(s)
+
+    Sx = 0.5 * (Sp + Sm)
+    Sy = -0.5im * (Sp-Sm)
+
+    Hderiv = [Sx, Sy, Sz]
+
+    S = cat(Sx, Sy, Sz; dims=3)
+    StDS = sum(D[i, j] * S[:, :, i] * S[:, :, j] for i in 1:3, j in 1:3)
+
+    solution = eigen(StDS)
+    energies = solution.values
+    states = solution.vectors
+
+    SS = -calc_F_deriv2(energies, states, Hderiv, T)
+
+    Br = Brillouin(s, T, B0)
+    sigma1 = zeros(length(Aiso), 3, 3)
+    chi = calc_susceptibility_vanVleck(param, T)
+    chi *= Br
+
+    shiftcon = Float64[]
+
+    for (i, Aiso_val) in enumerate(Aiso)
+
+        for l in 1:3, k in 1:3, o in 1:3, p in 1:3
+            if k == p
+                sigma1[i, l, k] += -(1/2) * g[l, o] * (Aiso_val*2pi) *(1/gammaI) * SS[o, p] * Br
+            end
+        end
+
+        if orientation
+            P = orientation_tensor(B0, T, chi)
+            con = -1/3 * tr(P * sigma1[i, :, :]) * 1e6
+        else
+            con = -1/3 * tr(sigma1[i, :, :]) * 1e6
+        end
+        push!(shiftcon, con)
+    end
+
+    return shiftcon
+end
+
+
+
+
+function calc_contactshift_fielddep(param::LFTParam, s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, orientation::Bool=false)
 
     gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
 
-    Sp = MagFieldLFT.calc_lplusminus(s, +1)
-    Sm = MagFieldLFT.calc_lplusminus(s, -1)
-    Sz = MagFieldLFT.calc_lz(s)
+    Sp = MagFieldLFT.calc_splusminus(s, +1)
+    Sm = MagFieldLFT.calc_splusminus(s, -1)
+    Sz = MagFieldLFT.calc_sz(s)
 
     Sx = 0.5 * (Sp + Sm)
     Sy = -0.5im * (Sp-Sm)
@@ -1337,6 +1417,7 @@ function calc_contactshift_fielddep(s::Int, Aiso::Matrix{Float64}, g::Matrix{Flo
 
     SS = -calc_F_deriv2(energies, states, Hderiv, T)
     sigma1 = zeros(length(Aiso), 3, 3)
+    chi = calc_susceptibility_vanVleck(param, T)
 
     SSSS = -calc_F_deriv4(energies, states, Hderiv, T)
     sigma3 = zeros(length(Aiso), 3, 3, 3, 3)
@@ -1355,7 +1436,13 @@ function calc_contactshift_fielddep(s::Int, Aiso::Matrix{Float64}, g::Matrix{Flo
             end
         end
 
-        con = -1/3 * tr(sigma1[i, :, :]) * 1e6 - 1/30 * trace_ord2(sigma3[i, :, :, :, :]) * B0^2 * 1e6
+        if orientation
+            P = orientation_tensor(B0, T, chi)
+            con = -1/3 * tr(P * sigma1[i, :, :]) * 1e6 - 1/30 * trace_ord2(sigma3[i, :, :, :, :]) * B0^2 * 1e6
+        else
+            con = -1/3 * tr(sigma1[i, :, :]) * 1e6 - 1/30 * trace_ord2(sigma3[i, :, :, :, :]) * B0^2 * 1e6
+        end
+
         push!(shiftcon, con)
     end
 
@@ -1363,8 +1450,9 @@ function calc_contactshift_fielddep(s::Int, Aiso::Matrix{Float64}, g::Matrix{Flo
 end
 
 
-function putline(args::Vararg{Any})
+#=========================================================================#
 
+function putline(args::Vararg{Any})
     s = string(rpad(args[1], 8, ' '))
     s *= join([lpad(arg, 12, ' ') for arg in args[2:end]])
     return s * "\n"
@@ -1400,13 +1488,44 @@ function write_cube(data, meta, fname)
                     if (i ≠ 1 || j ≠ 1 || k ≠ 1) && k % 6 == 1
                         write(cube, "\n")
                     end
-                    # write(cube, string(data[i, j, k]))
-                    # write(cube, "  ")
                     write(cube, " $(@sprintf(" %.5E", data[i, j, k]))")
                 end
             end
         end
     end
+end
+
+
+function getline(cube)
+    l = split(strip(readline(cube)))
+    return parse(Int, l[1]), parse.(Float64, l[2:end])
+end
+
+function read_cube(fname)
+    # written on the basis of:
+    # https://gist.github.com/aditya95sriram/8d1fccbb91dae93c4edf31cd6a22510f (see function "write_cube")
+    # see also: write_cube()
+
+    meta = Dict()
+    nx, ny, nz = 0, 0, 0
+    open(fname, "r") do cube
+        readline(cube); readline(cube)  # ignore comments
+        natm, meta["org"] = getline(cube)
+        nx, meta["xvec"] = getline(cube)
+        ny, meta["yvec"] = getline(cube)
+        nz, meta["zvec"] = getline(cube)
+        meta["atoms"] = [getline(cube) for i in 1:natm]
+        data = zeros(Float64, nx*ny*nz)
+        idx = 1
+        for line in eachline(cube)
+            for val in split(line)
+                data[idx] = parse(Float64, val)
+                idx += 1
+            end
+        end
+    end
+    data = reshape(data, (nx * ny * nz))
+    return data, meta
 end
 
 
