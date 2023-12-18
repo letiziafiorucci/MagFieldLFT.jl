@@ -1303,9 +1303,9 @@ function calc_contactshift_fieldindep(s::Float64, Aiso::Matrix{Float64}, g::Matr
     gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
     
-    Sp = MagFieldLFT.calc_splusminus(s, +1)
-    Sm = MagFieldLFT.calc_splusminus(s, -1)
-    Sz = MagFieldLFT.calc_sz(s)
+    Sp = calc_splusminus(s, +1)
+    Sm = calc_splusminus(s, -1)
+    Sz = calc_sz(s)
 
     Sx = 0.5 * (Sp + Sm)
     Sy = -0.5im * (Sp-Sm)
@@ -1346,9 +1346,9 @@ function calc_contactshift_fielddep_Br(param::LFTParam, s::Float64, Aiso::Matrix
     gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
     
-    Sp = MagFieldLFT.calc_splusminus(s, +1)
-    Sm = MagFieldLFT.calc_splusminus(s, -1)
-    Sz = MagFieldLFT.calc_sz(s)
+    Sp = calc_splusminus(s, +1)
+    Sm = calc_splusminus(s, -1)
+    Sz = calc_sz(s)
 
     Sx = 0.5 * (Sp + Sm)
     Sy = -0.5im * (Sp-Sm)
@@ -1399,9 +1399,9 @@ function calc_contactshift_fielddep(param::LFTParam, s::Float64, Aiso::Matrix{Fl
     gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
 
-    Sp = MagFieldLFT.calc_splusminus(s, +1)
-    Sm = MagFieldLFT.calc_splusminus(s, -1)
-    Sz = MagFieldLFT.calc_sz(s)
+    Sp = calc_splusminus(s, +1)
+    Sm = calc_splusminus(s, -1)
+    Sz = calc_sz(s)
 
     Sx = 0.5 * (Sp + Sm)
     Sy = -0.5im * (Sp-Sm)

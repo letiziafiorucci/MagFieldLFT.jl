@@ -727,7 +727,6 @@ function test_print_composition_ErIII()
     return (ref_ground == printed_string_ground) && (ref_ground_alt == printed_string_ground_alt)
 end
 
-<<<<<<< HEAD
 #at very low magnetic field the field dependent results and the zero field ones should be the same 
 function test_KurlandMcGarvey_ord4_Br_field()
     bohrinangstrom = 0.529177210903
@@ -853,9 +852,46 @@ function test_calc_contactshift()
 
 end
 
+function test_KurlandMcGarvey_vs_finitefield_Lebedev_ord4()
 
+    param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
+    T = 298.
+    bohrinangstrom = 0.529177210903
 
-=======
+    coordinate_matrice = []
+    nomi_atomi = []
+    coordinate_H = []
+
+    open("nisalfix_0.xyz", "r") do file
+        for ln in eachline(file)
+            clmn = split(ln)
+            push!(nomi_atomi, clmn[1])
+            push!(coordinate_matrice, parse.(Float64, clmn[2:end]))
+            if clmn[1]=="H"
+                push!(coordinate_H, parse.(Float64, clmn[2:end]))
+            end
+        end
+    end
+
+    R = convert(Vector{Vector{Float64}}, coordinate_H) ./ bohrinangstrom
+
+    shift_0 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, 0.0, false)
+    grid = lebedev_grids[20]
+    B0_single = [10., 80., 400., 800., 1200.]
+    diff_list_ord4 = []
+    diff_list_finitefield = []
+    for B0_MHz in B0_single 
+        B0 = B0_MHz/42.577478518/2.35051756758e5
+        finitefield_shifts = MagFieldLFT.estimate_shifts_finitefield(param, R, B0, T, grid)
+        shift_ord4 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, B0, true)
+        push!(diff_list_ord4, shift_0 .- shift_ord4)
+        push!(diff_list_finitefield, shift_0 .- finitefield_shifts)
+    end
+
+    return [norm(diff_list_ord4[i]-diff_list_finitefield[i])<2e-3 for i in eachindex(B0_single)]
+
+end
+
 function test_cubicresponse_spin()
     T = 298.0
     beta = 1/(MagFieldLFT.kB*T)
@@ -880,7 +916,6 @@ function test_cubicresponse_spin()
     return norm(SiSjSkSl - ref)/norm(ref) < 1.0e-10
 end
 
->>>>>>> 73e8501aa45003c75b1a4372b3c827f761819ef3
 @testset "MagFieldLFT.jl" begin
     @test test_createSDs()
     @test test_createSDs2()
@@ -932,9 +967,7 @@ end
     @test test_group_eigenvalues()
     @test test_print_composition2()
     @test test_print_composition_ErIII()
-<<<<<<< HEAD
     @test test_calc_contactshift()
-=======
+    @test test_KurlandMcGarvey_vs_finitefield_Lebedev_ord4()
     @test test_cubicresponse_spin()
->>>>>>> 73e8501aa45003c75b1a4372b3c827f761819ef3
 end
