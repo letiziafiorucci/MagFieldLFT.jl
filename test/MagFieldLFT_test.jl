@@ -877,7 +877,7 @@ function test_KurlandMcGarvey_vs_finitefield_Lebedev_ord4()
 
     shift_0 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, 0.0, false)
     grid = lebedev_grids[20]
-    B0_single = [10., 80., 400., 800., 1200.]   #!!!!!!! leave only the 10 MHz
+    B0_single = [10.]
     diff_list_ord4 = []
     diff_list_finitefield = []
     for B0_MHz in B0_single 
@@ -888,7 +888,7 @@ function test_KurlandMcGarvey_vs_finitefield_Lebedev_ord4()
         push!(diff_list_finitefield, shift_0 .- finitefield_shifts)
     end
 
-    return [norm(diff_list_ord4[i]-diff_list_finitefield[i])<2e-3 for i in eachindex(B0_single)]
+    return [norm(diff_list_ord4[i]-diff_list_finitefield[i])<1e-7 for i in eachindex(B0_single)]
 
 end
 
