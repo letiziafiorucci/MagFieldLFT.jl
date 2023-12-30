@@ -1,6 +1,6 @@
 module MagFieldLFT
 
-using LinearAlgebra, Permutations, OutputParser, DelimitedFiles, Printf
+using LinearAlgebra, Permutations, OutputParser, DelimitedFiles, Printf, TensorOperations
 
 export read_AILFT_params_ORCA, LFTParam, lebedev_grids
 
@@ -1173,17 +1173,12 @@ function adapt_basis_L2_S2_J2_Jz(param::LFTParam, format::String="QN")
 end
 
 function Brillouin(S::Float64, T::Float64, B0::Float64)
-    #B0 in au
-    #the calculation is in SI but the factor is adimensional
 
-    muB = 9.2740100783e-24
-    k = 1.380649e-23
-    ge = 2.0023
+    muB = 0.5
+    ge = 2.0
 
-    B0 *= 2.35051756758e5
-
-    k_B = 3/2*k*T /(ge*muB*S*(S+1)*B0)
-    a = muB*ge*B0/(2*k*T)
+    k_B = 3/2*kB*T /(ge*muB*S*(S+1)*B0)
+    a = muB*ge*B0/(2*kB*T)
     if B0 != 0
         Br = k_B*((2*S+1)/tanh((2*S+1)*a) - 1/tanh(a))
     else
@@ -1197,18 +1192,10 @@ function orientation_tensor(B0::Float64, T::Float64, chi::Array{Float64, 2})
     #field-induced self-orientation tensor 
     #(eq 112 from Parigi, G. et al, Progress in Nuclear Magnetic Resonance Spectroscopy 114–115 (2019) 211–236)
 
-    k = 1.380649e-23
-    mu0 = 1.25663706212e-06
-
-    B0 *= 2.35051756758e5  #conv field from a.u. to SI
-    He = 4.3597447222071e-18
-    fieldau = 2.35051756758e5
-    mu0 = 4*pi*1e-7
-    conv2 = mu0*He/fieldau^2
-    chi *= conv2/(4pi*alpha^2)  #conv chi from a.u. to SI
+    mu0 = 6.629e-4  
 
     w,v = eigen(chi)
-    a = (B0^2)/(5*mu0*k*T)
+    a = (B0^2)/(5*mu0*kB*T)
     chiiso = (1/3)*tr(Diagonal(w))
     Pw = zeros(3,3)
     for i in 1:3
@@ -1219,14 +1206,12 @@ function orientation_tensor(B0::Float64, T::Float64, chi::Array{Float64, 2})
 end
 
 function trace_ord2(tensor::Array{Float64, 4})
-    #computes the order 2 trace of a supersymmetric fourth order tensor
+    # computes the order 2 trace of a supersymmetric fourth order tensor
 
-    trace = 0.0
-    for i in 1:3
-        for j in 1:3
-            trace += tensor[i,i,j,j]
-        end
+    trace = @tensor begin
+        trace = tensor[i, i, j, j]
     end
+
     return trace
 end
 
@@ -1234,39 +1219,38 @@ function product_ord3(tensor::Array{Float64, 4}, Dip::Array{Float64, 2})
     #dot product between two fourth order tensors
 
     sigma = zeros(Float64, 3, 3, 3, 3)
-    for l in 1:3
-        for m in 1:3
-            for n in 1:3
-                for k in 1:3
-                    for q in 1:3
-                        sigma[l,m,n,k] += tensor[l,m,n,q]*Dip[q,k]
-                    end
-                end
-            end
-        end
+
+    @tensor begin
+        sigma[l, m, n, k] := tensor[l, m, n, q] * Dip[q, k]
     end
+
     return sigma
 end
 
+function calc_sigma4pcs(chi::Matrix, Ri::Vector{Float64}, T::Real, B0::Real, orientation::Bool)
+    Dip = calc_dipole_matrix(Ri)
+    if orientation
+        P = orientation_tensor(B0, T, chi)
+        sigma = -(1/(4pi)) * (P * chi * Dip)
+    else
+        sigma = -(1/(4pi)) * chi * Dip
+    end
+    return sigma
+end
 
 function calc_shifts_KurlandMcGarvey_ord4(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Real, orientation::Bool=false)
     #pcs calculation with Kurland-McGarvey equation 
     #the saturation effect is accounted for with fourth order tensor (determined via analytical equation)
 
-    chi1 = MagFieldLFT.calc_susceptibility_vanVleck(param, T)  
+    chi = calc_susceptibility_vanVleck(param, T)  
     chi3 = -4pi*alpha^2*calc_F_deriv4(param, T, [0.0,0.0,0.0]) 
   
     shifts = Vector{Float64}(undef, 0)
     for Ri in R
+        sigma = calc_sigma4pcs(chi, Ri, T, B0, orientation)
         Dip = calc_dipole_matrix(Ri)
-        if orientation
-            P = orientation_tensor(B0, T, chi1)
-            sigma1 = -(1/(4pi)) * (P * chi1 * Dip)
-        else
-            sigma1 = -(1/(4pi)) * chi1 * Dip
-        end
-        sigma3 = -(1/(4pi)) * product_ord3(chi3,Dip)
-        shift = -(1/3)*tr(sigma1) - (1/30)*trace_ord2(sigma3)*B0^2
+        tau = -(1/(4pi)) * (1/6) * product_ord3(chi3,Dip)
+        shift = -(1/3)*tr(sigma) - (1/5)*trace_ord2(tau)*B0^2
         push!(shifts, shift)
     end
     shifts *= 1e6    # convert to ppm
@@ -1283,13 +1267,7 @@ function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float6
 
     shifts = Vector{Float64}(undef, 0)
     for Ri in R
-        Dip = calc_dipole_matrix(Ri)
-        if orientation
-            P = orientation_tensor(B0, T, chi)
-            sigma = -(1/(4pi)) * (P * chi * Dip)
-        else
-            sigma = -(1/(4pi)) * chi * Dip
-        end
+        sigma = calc_sigma4pcs(chi, Ri, T, B0, orientation)
         shift = -(1/3)*tr(sigma)
         push!(shifts, shift)
     end
@@ -1447,85 +1425,6 @@ function calc_contactshift_fielddep(param::LFTParam, s::Float64, Aiso::Matrix{Fl
     end
 
     return shiftcon
-end
-
-
-#=========================================================================#
-
-function putline(args::Vararg{Any})
-    s = string(rpad(args[1], 8, ' '))
-    s *= join([lpad(arg, 12, ' ') for arg in args[2:end]])
-    return s * "\n"
-end
-
-function write_cube(data, meta, fname)
-    # written on the basis of:
-    # https://gist.github.com/aditya95sriram/8d1fccbb91dae93c4edf31cd6a22510f (see function "write_cube")
-    #
-    # data: volumetric data consisting real values
-    # meta: dict containing metadata with following keys
-    #     atoms: list of atoms in the form (mass, charge, [position])
-    #     org: origin
-    #     xvec,yvec,zvec: lattice vector basis
-    # fname: filename of cubefile
-
-    open(fname, "w") do cube
-        write(cube, "Cubefile created by MagFieldLFT.jl\nOUTER LOOP: X, MIDDLE LOOP: Y, INNER LOOP: Z\n")
-        natm = length(meta["atoms"])
-        nx, ny, nz = size(data)
-
-        write(cube, putline(natm, meta["org"]...))
-        write(cube, putline(nx, meta["xvec"]...))
-        write(cube, putline(nx, meta["yvec"]...))
-        write(cube, putline(nx, meta["zvec"]...))
-
-        for (atom_mass, atom_charge, atom_pos) in meta["atoms"]
-            write(cube, putline(atom_mass, atom_charge, atom_pos...))
-        end
-        for i in 1:nx
-            for j in 1:ny
-                for k in 1:nz
-                    if (i ≠ 1 || j ≠ 1 || k ≠ 1) && k % 6 == 1
-                        write(cube, "\n")
-                    end
-                    write(cube, " $(@sprintf(" %.5E", data[i, j, k]))")
-                end
-            end
-        end
-    end
-end
-
-
-function getline(cube)
-    l = split(strip(readline(cube)))
-    return parse(Int, l[1]), parse.(Float64, l[2:end])
-end
-
-function read_cube(fname)
-    # written on the basis of:
-    # https://gist.github.com/aditya95sriram/8d1fccbb91dae93c4edf31cd6a22510f (see function "write_cube")
-    # see also: write_cube()
-
-    meta = Dict()
-    nx, ny, nz = 0, 0, 0
-    open(fname, "r") do cube
-        readline(cube); readline(cube)  # ignore comments
-        natm, meta["org"] = getline(cube)
-        nx, meta["xvec"] = getline(cube)
-        ny, meta["yvec"] = getline(cube)
-        nz, meta["zvec"] = getline(cube)
-        meta["atoms"] = [getline(cube) for i in 1:natm]
-        data = zeros(Float64, nx*ny*nz)
-        idx = 1
-        for line in eachline(cube)
-            for val in split(line)
-                data[idx] = parse(Float64, val)
-                idx += 1
-            end
-        end
-    end
-    data = reshape(data, (nx * ny * nz))
-    return data, meta
 end
 
 
