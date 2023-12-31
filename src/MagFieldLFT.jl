@@ -1188,6 +1188,11 @@ function Brillouin(S::Float64, T::Float64, B0::Float64)
     return Br
 end
 
+function Brillouin_truncated(S::Float64, T::Float64, B0::Float64)
+    Br = 1 + B0^2/(240*(kB*T)^2*S(S+1)) * (1-(2S+1)^4)
+    return Br
+end
+
 function orientation_tensor(B0::Float64, T::Float64, chi::Array{Float64, 2})
     #field-induced self-orientation tensor 
     #(eq 112 from Parigi, G. et al, Progress in Nuclear Magnetic Resonance Spectroscopy 114–115 (2019) 211–236)
