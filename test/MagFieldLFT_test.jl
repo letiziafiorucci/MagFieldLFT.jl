@@ -875,7 +875,7 @@ function test_KurlandMcGarvey_vs_finitefield_Lebedev_ord4()
 
     R = convert(Vector{Vector{Float64}}, coordinate_H) ./ bohrinangstrom
 
-    shift_0 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, 0.0, false)
+    shift_0 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, 0.0, false, false)
     grid = lebedev_grids[20]
     B0_single = [10.]
     diff_list_ord4 = []
@@ -883,7 +883,7 @@ function test_KurlandMcGarvey_vs_finitefield_Lebedev_ord4()
     for B0_MHz in B0_single 
         B0 = B0_MHz/42.577478518/2.35051756758e5
         finitefield_shifts = MagFieldLFT.estimate_shifts_finitefield(param, R, B0, T, grid)
-        shift_ord4 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, B0, true)
+        shift_ord4 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, B0, true, true)
         push!(diff_list_ord4, shift_0 .- shift_ord4)
         push!(diff_list_finitefield, shift_0 .- finitefield_shifts)
     end

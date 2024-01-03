@@ -6,6 +6,7 @@ export read_AILFT_params_ORCA, LFTParam, lebedev_grids
 
 const kB = 3.166811563e-6    # Boltzmann constant in Eh/K
 const alpha = 0.0072973525693  # fine structure constant
+const mu0 = 6.629e-4
 
 function xyz2spher(x::Real, y::Real, z::Real)
     theta = acos(z)
@@ -1243,37 +1244,64 @@ function calc_sigma4pcs(chi::Matrix, Ri::Vector{Float64}, T::Real, B0::Real, ori
     return sigma
 end
 
-function calc_shifts_KurlandMcGarvey_ord4(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Real, orientation::Bool=false)
+function calc_shifts_KurlandMcGarvey_ord4(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Real, direct::Bool=false, selforient::Bool=false)
     #pcs calculation with Kurland-McGarvey equation 
     #the saturation effect is accounted for with fourth order tensor (determined via analytical equation)
 
-    chi = calc_susceptibility_vanVleck(param, T)  
-    chi3 = -4pi*alpha^2*calc_F_deriv4(param, T, [0.0,0.0,0.0]) 
+    beta = 1/(kB*T)
+
+    chi = calc_susceptibility_vanVleck(param, T)
+    if direct
+        chi3 = -4pi*alpha^2*calc_F_deriv4(param, T, [0.0,0.0,0.0]) 
+    end
   
     shifts = Vector{Float64}(undef, 0)
     for Ri in R
-        sigma = calc_sigma4pcs(chi, Ri, T, B0, orientation)
         Dip = calc_dipole_matrix(Ri)
-        tau = -(1/(4pi)) * (1/6) * product_ord3(chi3,Dip)
-        shift = -(1/3)*tr(sigma) - (1/5)*trace_ord2(tau)*B0^2
+        sigma = -(1/(4pi)) * chi * Dip
+        shift = -(1/3)*tr(sigma)
+        println("zero ",shift)
+
+        if direct
+            tau = -(1/(4pi)) * (1/6) * product_ord3(chi3,Dip)
+            shift += - (1/5)*trace_ord2(tau)*B0^2
+            println("direct ",shift)
+        end
+
+        if selforient
+            shift += (1/45 * beta/mu0 *tr(sigma)*tr(chi) - 1/15 * beta/mu0 * tr(sigma*chi))*B0^2
+            println("orient ",shift)
+        end
+
         push!(shifts, shift)
     end
     shifts *= 1e6    # convert to ppm
     return shifts
 end
 
-function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Float64, S::Float64, orientation::Bool=false)
+function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Float64, S::Float64, direct::Bool=false, selforient::Bool=false)
     #pcs calculation with Kurland-McGarvey equation
     #the saturation effect is accounted for with Brillouin equation
 
+    beta = 1/(kB*T)
+
     Br = Brillouin(S, T, B0)
     chi = calc_susceptibility_vanVleck(param, T)
-    chi *= Br
 
     shifts = Vector{Float64}(undef, 0)
     for Ri in R
-        sigma = calc_sigma4pcs(chi, Ri, T, B0, orientation)
+        Dip = calc_dipole_matrix(Ri)
+        sigma = -(1/(4pi)) * chi * Dip
         shift = -(1/3)*tr(sigma)
+
+        if direct
+            shift = -(1/3)*tr(sigma .* Br)
+        end
+
+        if selforient
+            shift += (1/45 * beta/mu0 *tr(sigma .* Br)*tr(chi .* Br) - 1/15 * beta/mu0 * tr(sigma*chi .* Br^2))*B0^2
+        end
+
         push!(shifts, shift)
     end
     shifts *= 1e6    # convert to ppm
