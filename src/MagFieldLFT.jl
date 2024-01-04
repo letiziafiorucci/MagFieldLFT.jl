@@ -1190,7 +1190,7 @@ function Brillouin(S::Float64, T::Float64, B0::Float64)
 end
 
 function Brillouin_truncated(S::Float64, T::Float64, B0::Float64)
-    Br = 1 + B0^2/(240*(kB*T)^2*S(S+1)) * (1-(2S+1)^4)
+    Br = 1 + B0^2/(240*(kB*T)^2*S*(S+1)) * (1-(2*S+1)^4)
     return Br
 end
 
@@ -1233,17 +1233,6 @@ function product_ord3(tensor::Array{Float64, 4}, Dip::Array{Float64, 2})
     return sigma
 end
 
-function calc_sigma4pcs(chi::Matrix, Ri::Vector{Float64}, T::Real, B0::Real, orientation::Bool)
-    Dip = calc_dipole_matrix(Ri)
-    if orientation
-        P = orientation_tensor(B0, T, chi)
-        sigma = -(1/(4pi)) * (P * chi * Dip)
-    else
-        sigma = -(1/(4pi)) * chi * Dip
-    end
-    return sigma
-end
-
 function calc_shifts_KurlandMcGarvey_ord4(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Real, direct::Bool=false, selforient::Bool=false)
     #pcs calculation with Kurland-McGarvey equation 
     #the saturation effect is accounted for with fourth order tensor (determined via analytical equation)
@@ -1260,17 +1249,14 @@ function calc_shifts_KurlandMcGarvey_ord4(param::LFTParam, R::Vector{Vector{Floa
         Dip = calc_dipole_matrix(Ri)
         sigma = -(1/(4pi)) * chi * Dip
         shift = -(1/3)*tr(sigma)
-        println("zero ",shift)
 
         if direct
             tau = -(1/(4pi)) * (1/6) * product_ord3(chi3,Dip)
             shift += - (1/5)*trace_ord2(tau)*B0^2
-            println("direct ",shift)
         end
 
         if selforient
             shift += (1/45 * beta/mu0 *tr(sigma)*tr(chi) - 1/15 * beta/mu0 * tr(sigma*chi))*B0^2
-            println("orient ",shift)
         end
 
         push!(shifts, shift)
@@ -1285,7 +1271,8 @@ function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float6
 
     beta = 1/(kB*T)
 
-    Br = Brillouin(S, T, B0)
+    #Br = Brillouin(S, T, B0)
+    Br = Brillouin_truncated(S, T, B0)
     chi = calc_susceptibility_vanVleck(param, T)
 
     shifts = Vector{Float64}(undef, 0)
@@ -1299,7 +1286,7 @@ function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float6
         end
 
         if selforient
-            shift += (1/45 * beta/mu0 *tr(sigma .* Br)*tr(chi .* Br) - 1/15 * beta/mu0 * tr(sigma*chi .* Br^2))*B0^2
+            shift += (1/45 * beta/mu0 *tr(sigma .* Br)*tr(chi .* Br) - 1/15 * beta/mu0 * tr(sigma*chi .* Br^2))*B0^2  #remove Br 
         end
 
         push!(shifts, shift)
@@ -1375,7 +1362,8 @@ function calc_contactshift_fielddep_Br(param::LFTParam, s::Float64, Aiso::Matrix
 
     SS = -calc_F_deriv2(energies, states, Hderiv, T)
 
-    Br = Brillouin(s, T, B0)
+    #Br = Brillouin(S, T, B0)
+    Br = Brillouin_truncated(S, T, B0)
     sigma1 = zeros(length(Aiso), 3, 3)
     chi = calc_susceptibility_vanVleck(param, T)
     chi *= Br
