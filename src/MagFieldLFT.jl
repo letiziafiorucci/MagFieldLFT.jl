@@ -6,7 +6,7 @@ export read_AILFT_params_ORCA, LFTParam, lebedev_grids
 
 const kB = 3.166811563e-6    # Boltzmann constant in Eh/K
 const alpha = 0.0072973525693  # fine structure constant
-const mu0 = 6.629e-4
+const mu0 = 4pi*alpha^2
 
 function xyz2spher(x::Real, y::Real, z::Real)
     theta = acos(z)
@@ -1196,9 +1196,7 @@ end
 
 function orientation_tensor(B0::Float64, T::Float64, chi::Array{Float64, 2})
     #field-induced self-orientation tensor 
-    #(eq 112 from Parigi, G. et al, Progress in Nuclear Magnetic Resonance Spectroscopy 114–115 (2019) 211–236)
-
-    mu0 = 6.629e-4  
+    #(eq 112 from Parigi, G. et al, Progress in Nuclear Magnetic Resonance Spectroscopy 114–115 (2019) 211–236) 
 
     w,v = eigen(chi)
     a = (B0^2)/(5*mu0*kB*T)
@@ -1286,7 +1284,7 @@ function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float6
         end
 
         if selforient
-            shift += (1/45 * beta/mu0 *tr(sigma .* Br)*tr(chi .* Br) - 1/15 * beta/mu0 * tr(sigma*chi .* Br^2))*B0^2  #remove Br 
+            shift += (1/45 * beta/mu0 *tr(sigma)*tr(chi) - 1/15 * beta/mu0 * tr(sigma*chi))*B0^2   
         end
 
         push!(shifts, shift)
@@ -1295,12 +1293,8 @@ function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float6
     return shifts
 end
 
+function calc_dyadics(s::Float64, D::Matrix{Float64}, T::Real, quadruple::Bool)
 
-function calc_contactshift_fieldindep(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real)
-
-    gammaI = 2.6752e8*1e-6 
-    gammaI *= 2.35051756758e5
-    
     Sp = calc_splusminus(s, +1)
     Sm = calc_splusminus(s, -1)
     Sz = calc_sz(s)
@@ -1319,19 +1313,33 @@ function calc_contactshift_fieldindep(s::Float64, Aiso::Matrix{Float64}, g::Matr
 
     SS = -calc_F_deriv2(energies, states, Hderiv, T)
 
+    if quadruple
+
+        SSSS = -calc_F_deriv4(energies, states, Hderiv, T)
+
+        return SS, SSSS
+    else
+        return SS
+    end
+
+end
+
+function calc_contactshift_fieldindep(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real)
+
+    gammaI = 2.6752e8*1e-6 
+    gammaI *= 2.35051756758e5
+    
+    SS = calc_dyadics(s, D, T, false)
+
     sigma1 = zeros(length(Aiso), 3, 3)
 
     shiftcon = Float64[]
 
     for (i, Aiso_val) in enumerate(Aiso)
 
-        for l in 1:3, k in 1:3, o in 1:3, p in 1:3
-            if k == p
-                sigma1[i, l, k] += -(1/2) * g[l, o] * (Aiso_val*2pi) *(1/gammaI) * SS[o, p]
-            end
-        end
+        sigma1[i] = -(1/(2*gammaI))*g*SS*Diagonal(Aiso[i]*2pi*ones(3))
 
-        con = -1/3 * tr(sigma1[i, :, :]) * 1e6
+        con = -1/3 * tr(sigma1[i]) * 1e6
         push!(shiftcon, con)
     end
 
@@ -1343,27 +1351,11 @@ function calc_contactshift_fielddep_Br(param::LFTParam, s::Float64, Aiso::Matrix
 
     gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
-    
-    Sp = calc_splusminus(s, +1)
-    Sm = calc_splusminus(s, -1)
-    Sz = calc_sz(s)
 
-    Sx = 0.5 * (Sp + Sm)
-    Sy = -0.5im * (Sp-Sm)
+    SS = calc_dyadics(s, D, T, false)
 
-    Hderiv = [Sx, Sy, Sz]
-
-    S = cat(Sx, Sy, Sz; dims=3)
-    StDS = sum(D[i, j] * S[:, :, i] * S[:, :, j] for i in 1:3, j in 1:3)
-
-    solution = eigen(StDS)
-    energies = solution.values
-    states = solution.vectors
-
-    SS = -calc_F_deriv2(energies, states, Hderiv, T)
-
-    #Br = Brillouin(S, T, B0)
-    Br = Brillouin_truncated(S, T, B0)
+    #Br = Brillouin(s, T, B0)
+    Br = Brillouin_truncated(s, T, B0)
     sigma1 = zeros(length(Aiso), 3, 3)
     chi = calc_susceptibility_vanVleck(param, T)
     chi *= Br
@@ -1398,27 +1390,11 @@ function calc_contactshift_fielddep(param::LFTParam, s::Float64, Aiso::Matrix{Fl
     gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
 
-    Sp = calc_splusminus(s, +1)
-    Sm = calc_splusminus(s, -1)
-    Sz = calc_sz(s)
-
-    Sx = 0.5 * (Sp + Sm)
-    Sy = -0.5im * (Sp-Sm)
-
-    Hderiv = [Sx, Sy, Sz]
-
-    S = cat(Sx, Sy, Sz; dims=3)
-    StDS = sum(D[i, j] * S[:, :, i] * S[:, :, j] for i in 1:3, j in 1:3)
-
-    solution = eigen(StDS)
-    energies = solution.values
-    states = solution.vectors
-
-    SS = -calc_F_deriv2(energies, states, Hderiv, T)
-    sigma1 = zeros(length(Aiso), 3, 3)
+    SS, SSSS = calc_dyadics(s, D, T, true)
+    
     chi = calc_susceptibility_vanVleck(param, T)
 
-    SSSS = -calc_F_deriv4(energies, states, Hderiv, T)
+    sigma1 = zeros(length(Aiso), 3, 3)
     sigma3 = zeros(length(Aiso), 3, 3, 3, 3)
 
     shiftcon = Float64[]
