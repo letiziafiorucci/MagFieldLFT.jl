@@ -1347,7 +1347,7 @@ function calc_contactshift_fieldindep(s::Float64, Aiso::Matrix{Float64}, g::Matr
 end
 
 
-function calc_contactshift_fielddep_Br(param::LFTParam, s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, orientation::Bool=false)
+function calc_contactshift_fielddep_Br(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, orientation::Bool=false)
 
     gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
@@ -1357,7 +1357,8 @@ function calc_contactshift_fielddep_Br(param::LFTParam, s::Float64, Aiso::Matrix
     #Br = Brillouin(s, T, B0)
     Br = Brillouin_truncated(s, T, B0)
     sigma1 = zeros(length(Aiso), 3, 3)
-    chi = calc_susceptibility_vanVleck(param, T)
+
+    chi = pi*MagFieldLFT.alpha^2 * g * SS * g'
     chi *= Br
 
     shiftcon = Float64[]
@@ -1385,14 +1386,14 @@ end
 
 
 
-function calc_contactshift_fielddep(param::LFTParam, s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, orientation::Bool=false)
+function calc_contactshift_fielddep(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, orientation::Bool=false)
 
     gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
 
     SS, SSSS = calc_dyadics(s, D, T, true)
     
-    chi = calc_susceptibility_vanVleck(param, T)
+    chi = pi*MagFieldLFT.alpha^2 * g * SS * g'
 
     sigma1 = zeros(length(Aiso), 3, 3)
     sigma3 = zeros(length(Aiso), 3, 3, 3, 3)
