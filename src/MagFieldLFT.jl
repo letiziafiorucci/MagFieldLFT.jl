@@ -1284,7 +1284,12 @@ function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float6
         end
 
         if selforient
-            shift += (1/45 * beta/mu0 *tr(sigma)*tr(chi) - 1/15 * beta/mu0 * tr(sigma*chi))*B0^2   
+            shift += (1/45 * beta/mu0 *tr(sigma)*tr(chi) - 1/15 * beta/mu0 * tr(sigma*chi))*B0^2 
+            println(((1/45 * beta/mu0 *tr(sigma)*tr(chi) - 1/15 * beta/mu0 * tr(sigma*chi))*B0^2)*1e6) 
+            P = orientation_tensor(B0, T, chi)
+            con = -1/3 * tr(P * sigma) * 1e6 - (-1/3 * tr(sigma) * 1e6)
+            println(con) 
+            exit()
         end
 
         push!(shifts, shift)
@@ -1324,42 +1329,21 @@ function calc_dyadics(s::Float64, D::Matrix{Float64}, T::Real, quadruple::Bool)
 
 end
 
-function calc_contactshift_fieldindep(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real)
+
+function calc_contactshift_fielddep_Br(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, direct::Bool=false, selforient::Bool=false)
 
     gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
-    
-    SS = calc_dyadics(s, D, T, false)
 
-    sigma1 = zeros(length(Aiso), 3, 3)
-
-    shiftcon = Float64[]
-
-    for (i, Aiso_val) in enumerate(Aiso)
-
-        sigma1[i] = -(1/(2*gammaI))*g*SS*Diagonal(Aiso[i]*2pi*ones(3))
-
-        con = -1/3 * tr(sigma1[i]) * 1e6
-        push!(shiftcon, con)
-    end
-
-    return shiftcon
-end
-
-
-function calc_contactshift_fielddep_Br(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, orientation::Bool=false)
-
-    gammaI = 2.6752e8*1e-6 
-    gammaI *= 2.35051756758e5
+    beta = 1/(kB*T)
 
     SS = calc_dyadics(s, D, T, false)
 
     #Br = Brillouin(s, T, B0)
     Br = Brillouin_truncated(s, T, B0)
-    sigma1 = zeros(length(Aiso), 3, 3)
+    sigma = zeros(length(Aiso), 3, 3)
 
     chi = pi*MagFieldLFT.alpha^2 * g * SS * g'
-    chi *= Br
 
     shiftcon = Float64[]
 
@@ -1367,16 +1351,22 @@ function calc_contactshift_fielddep_Br(s::Float64, Aiso::Matrix{Float64}, g::Mat
 
         for l in 1:3, k in 1:3, o in 1:3, p in 1:3
             if k == p
-                sigma1[i, l, k] += -(1/2) * g[l, o] * (Aiso_val*2pi) *(1/gammaI) * SS[o, p] * Br
+                sigma[i, l, k] += -(1/2) * g[l, o] * (Aiso_val*2pi) *(1/gammaI) * SS[o, p]
             end
         end
 
-        if orientation
-            P = orientation_tensor(B0, T, chi)
-            con = -1/3 * tr(P * sigma1[i, :, :]) * 1e6
-        else
-            con = -1/3 * tr(sigma1[i, :, :]) * 1e6
+        con = 0
+
+        if selforient
+            con = ((1/45 * beta/mu0 *tr(sigma[i,:,:])*tr(chi) - 1/15 * beta/mu0 * tr(sigma[i,:,:]*chi))*B0^2) * 1e6
         end
+
+        if direct
+            sigma[i,:,:] *= Br
+        end
+
+        con += -1/3 * tr(sigma[i, :, :]) * 1e6
+        
         push!(shiftcon, con)
     end
 
@@ -1386,10 +1376,12 @@ end
 
 
 
-function calc_contactshift_fielddep(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, orientation::Bool=false)
+function calc_contactshift_fielddep(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, direct::Bool=false, selforient::Bool=false)
 
     gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
+
+    beta = 1/(kB*T)
 
     SS, SSSS = calc_dyadics(s, D, T, true)
     
@@ -1412,11 +1404,14 @@ function calc_contactshift_fielddep(s::Float64, Aiso::Matrix{Float64}, g::Matrix
             end
         end
 
-        if orientation
-            P = orientation_tensor(B0, T, chi)
-            con = -1/3 * tr(P * sigma1[i, :, :]) * 1e6 - 1/30 * trace_ord2(sigma3[i, :, :, :, :]) * B0^2 * 1e6
-        else
-            con = -1/3 * tr(sigma1[i, :, :]) * 1e6 - 1/30 * trace_ord2(sigma3[i, :, :, :, :]) * B0^2 * 1e6
+        con = -1/3 * tr(sigma1[i, :, :]) * 1e6
+
+        if direct
+            con += - 1/30 * trace_ord2(sigma3[i, :, :, :, :]) * B0^2 * 1e6
+        end
+
+        if selforient
+            con += ((1/45 * beta/mu0 *tr(sigma1[i,:,:])*tr(chi) - 1/15 * beta/mu0 * tr(sigma1[i,:,:]*chi))*B0^2) * 1e6
         end
 
         push!(shiftcon, con)
