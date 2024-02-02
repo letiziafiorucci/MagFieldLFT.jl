@@ -1285,11 +1285,6 @@ function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float6
 
         if selforient
             shift += (1/45 * beta/mu0 *tr(sigma)*tr(chi) - 1/15 * beta/mu0 * tr(sigma*chi))*B0^2 
-            println(((1/45 * beta/mu0 *tr(sigma)*tr(chi) - 1/15 * beta/mu0 * tr(sigma*chi))*B0^2)*1e6) 
-            P = orientation_tensor(B0, T, chi)
-            con = -1/3 * tr(P * sigma) * 1e6 - (-1/3 * tr(sigma) * 1e6)
-            println(con) 
-            exit()
         end
 
         push!(shifts, shift)
