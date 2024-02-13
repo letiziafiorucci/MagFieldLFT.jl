@@ -784,53 +784,20 @@ function test_KurlandMcGarvey_ord4_Br_temperature()
     shift_ord4 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, B0)
     Br_shifts = MagFieldLFT.calc_shifts_KurlandMcGarvey_Br(param, R, T, B0, S)
 
-    # println(shift_ord4, Br_shifts)
-    # println(norm((shift_ord4 - Br_shifts) .* 100 ./ shift_ord4))
-
     return norm((shift_ord4 - Br_shifts) .* 100 ./ shift_ord4) < 5.0e-2
-end
-
-
-function fielddepshift_cube()
-
-    points = -1.5:0.1:1.5
-
-    meshgrid(xs, ys, zs) = [xs[i] for i in 1:length(xs), j in 1:length(ys), k in 1:length(zs)], [ys[j] for i in 1:length(xs), j in 1:length(ys), k in 1:length(zs)], [zs[k] for i in 1:length(xs), j in 1:length(ys), k in 1:length(zs)]
-    datax, datay, dataz = meshgrid(points, points, points)
-    meta = Dict("xvec" => [1.0 0.0 0.0], "yvec" => [0.0 1.0 0.0], "zvec" => [0.0 0.0 1.0], "atoms" => [(1, 1, [0.0 0.0 0.0])], "org" => [0.0 0.0 0.0])
-
-    param = read_AILFT_params_ORCA("NiSAL_HDPT.out", "CASSCF")
-    T = 298. 
-    B0_MHz = 400. 
-    B0 = B0_MHz/42.577478518/2.35051756758e5  # from MHz to au
-
-    data = zeros(size(datax))
-    for i in 1:size(datax)[1]
-        for j in 1:size(datax)[2]
-            for k in 1:size(datax)[3]
-                println(i,j,k)
-                matrix = [datax[i,j,k] datay[i,j,k] dataz[i,j,k]]
-                shift0 = MagFieldLFT.calc_shifts_KurlandMcGarvey(param, [vec(matrix)], T)[1]
-                shift1 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, [vec(matrix)], T, B0, false)[1]
-                data[i,j,k] = shift0-shift1
-            end
-        end
-    end
-    MagFieldLFT.write_cube(data, meta, "corrord4_NiSAL.cube")
-
 end
 
 
 function test_calc_contactshift()
 
     from_au = 27.2113834*8065.54477
-    #from calcsuscenisal_10.out casscf-nevpt2 effective hamiltonian
+    #from casscf-nevpt2 effective hamiltonian
     D = [3.021254 -5.482999 -16.364810; -5.482999 21.938653 -7.107412; -16.364810 -7.107412 -0.931482]
     D /= from_au  #from cm-1 in au
 
-    #from calcsuscenisal_10.out casscf-nevpt2 effective hamiltonian
+    #from casscf-nevpt2 effective hamiltonian
     g = [2.320356 0.036880 0.109631; 0.036810 2.180382 0.053365; 0.109499 0.053077 2.347002]
-    #from Nisalfix_eprnmr.out DFT calc
+    #from DFT calc
     Aiso = [-0.2398	0.3677	-0.0953	0.1169	5.6311	0.8206	2.5466	0.9669	2.2237	-0.2058	0.3801	-0.0323	0.0943	5.7383	-0.1162	-0.1048	1.3015	4.0604	3.9516	0.929	-0.1677	-0.2015	-3.5469]
     T = 298.0
 
@@ -838,8 +805,6 @@ function test_calc_contactshift()
     B0 = B0_MHz/42.577478518/2.35051756758e5
 
     shiftcon = MagFieldLFT.calc_contactshift_fieldindep(1, Aiso, g, D, T)
-    # println("fieldindep ",shiftcon)
-
     indices = [1, 23, 5, 14]
     calc_shift = [shiftcon[i] for i in indices]
 
@@ -862,7 +827,7 @@ function test_KurlandMcGarvey_vs_finitefield_Lebedev_ord4()
     nomi_atomi = []
     coordinate_H = []
 
-    open("nisalfix_0.xyz", "r") do file
+    open("nisalhdpt.xyz", "r") do file
         for ln in eachline(file)
             clmn = split(ln)
             push!(nomi_atomi, clmn[1])
