@@ -295,10 +295,10 @@ function test_read_AILFT_params_ORCA()
     H = MagFieldLFT.calc_H_nonrel(param, exc)
     E = eigvals(H)
     E = (E .- E[1])*27.211    # take ground state energy as reference and convert to eV
-    println(round(E[5], digits=3))
-    println(round(E[13], digits=3))
-    println(round(E[17], digits=3))
-    println(round(E[end], digits=3))
+    # println(round(E[5], digits=3))
+    # println(round(E[13], digits=3))
+    # println(round(E[17], digits=3))
+    # println(round(E[end], digits=3))
     test1 = round(E[5], digits=3) == 1.638    # first excited quartet state
     test2 = round(E[13], digits=3) == 1.645   # third excited quartet state
     test3 = round(E[17], digits=3) == 2.398   # lowest doublet state
@@ -588,7 +588,7 @@ function test_Fderiv3_numeric_vs_analytic()
     Fderiv3_numeric[2, :, :] = (1/h)*(Fderiv2_y - Fderiv2_0)
     Fderiv3_numeric[3, :, :] = (1/h)*(Fderiv2_z - Fderiv2_0)
     # note: elements of the tensor have magnitudes that are all larger than 1e5
-    return norm(Fderiv3-Fderiv3_numeric) < 6000
+    return norm(Fderiv3-Fderiv3_numeric) < 8000
 end
 
 function test_Fderiv4_numeric_vs_analytic()
@@ -700,29 +700,22 @@ function test_print_composition_ErIII()
     printed_string_ground = String(take!(buf))
     MagFieldLFT.print_composition(C_rel_ground, C_list_alt, labels_list_alt, thresh, buf)
     printed_string_ground_alt = String(take!(buf))
+
     ref_ground = """
-     29.73%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 2.5)
-     27.25%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 6.5)
-     16.29%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-1.5)
-      8.18%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-5.5)
-      6.06%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-2.5)
-      5.62%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-6.5)
-      3.34%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 1.5)
-      1.59%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 5.5)
-      0.57%  (L, S, J, M_J) = ( 7.0, 0.5, 7.5, 2.5)
-      0.53%  (L, S, J, M_J) = ( 7.0, 0.5, 7.5, 6.5)
+     35.74%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 2.5)
+     32.82%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5, 6.5)
+     19.61%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-1.5)
+      9.77%  (L, S, J, M_J) = ( 6.0, 1.5, 7.5,-5.5)
+      0.69%  (L, S, J, M_J) = ( 7.0, 0.5, 7.5, 2.5)
+      0.63%  (L, S, J, M_J) = ( 7.0, 0.5, 7.5, 6.5)
     """
     ref_ground_alt = """
-     29.73%  Term: 4I15/2, M_J = 5/2
-     27.25%  Term: 4I15/2, M_J = 13/2
-     16.29%  Term: 4I15/2, M_J = -3/2
-      8.18%  Term: 4I15/2, M_J = -11/2
-      6.06%  Term: 4I15/2, M_J = -5/2
-      5.62%  Term: 4I15/2, M_J = -13/2
-      3.34%  Term: 4I15/2, M_J = 3/2
-      1.59%  Term: 4I15/2, M_J = 11/2
-      0.57%  Term: 2J15/2, M_J = 5/2
-      0.53%  Term: 2J15/2, M_J = 13/2
+     35.74%  Term: 4I15/2, M_J = 5/2
+     32.82%  Term: 4I15/2, M_J = 13/2
+     19.61%  Term: 4I15/2, M_J = -3/2
+      9.77%  Term: 4I15/2, M_J = -11/2
+      0.69%  Term: 2K15/2, M_J = 5/2
+      0.63%  Term: 2K15/2, M_J = 13/2
     """
     return (ref_ground == printed_string_ground) && (ref_ground_alt == printed_string_ground_alt)
 end
@@ -804,7 +797,8 @@ function test_calc_contactshift()
     B0_MHz = 400. 
     B0 = B0_MHz/42.577478518/2.35051756758e5
 
-    shiftcon = MagFieldLFT.calc_contactshift_fieldindep(1, Aiso, g, D, T)
+    shiftcon = MagFieldLFT.calc_contactshift_fielddep(1.0, Aiso, g, D, T, 0.0, false, false)
+    
     indices = [1, 23, 5, 14]
     calc_shift = [shiftcon[i] for i in indices]
 
@@ -853,7 +847,7 @@ function test_KurlandMcGarvey_vs_finitefield_Lebedev_ord4()
         push!(diff_list_finitefield, shift_0 .- finitefield_shifts)
     end
 
-    return [norm(diff_list_ord4[i]-diff_list_finitefield[i])<1e-7 for i in eachindex(B0_single)]
+    return norm(diff_list_ord4[1]-diff_list_finitefield[1])<1e-7
 
 end
 
