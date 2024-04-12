@@ -584,7 +584,6 @@ function read_AILFT_params_ORCA(outfile::String, method::String)
     return LFTParam(nel, norb, l, hLFT, F, zeta)
 end
 
-#this just works for the NEVPT2, since in the CASSCF result there's the F0 term
 function read_AILFT_params_ORCA6(outfile::String, method::String)
     nel = parse_int(outfile, ["nel"], 0, 3)
     norb = parse_int(outfile, ["norb"], 0, 3)
@@ -836,7 +835,9 @@ function read_integrals_oneelint(fileint::String, dim::Int)
 
     end
     integrals = reshape(integrals, (dim,dim)) 
-    integrals = Hermitian(integrals)
+    
+    perm = [6,4,2,1,3,5,7]    # change order from 0,1,-1,2,-2,3,-3 to 3,2,1,0,-1,-2,-3
+    integrals = integrals[perm, perm]
 
     return integrals
 end
@@ -927,6 +928,10 @@ function read_integrals_so_f(fileint::String)   #could be adjuted to be used for
     for i in eachindex(Integrals)
         Integrals[i] = Integrals[i][perm, perm]*im
     end
+
+    # for i in eachindex(Integrals)
+    #     Integrals[i] = Integrals[i]*im
+    # end
     return Integrals
 
 end
