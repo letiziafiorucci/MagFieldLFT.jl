@@ -877,7 +877,7 @@ function read_integrals_ee(fileint::String, dim::Int)
 
     # integrals = integrals[perm, :, :, :]
 
-    #equivalent to the one above
+    #equivalent to the implementation above
     integrals = integrals[perm, perm, perm, perm]
 
     return integrals
@@ -1583,16 +1583,25 @@ function product_ord3(tensor::Array{Float64, 4}, Dip::Array{Float64, 2})
     return sigma
 end
 
-function calc_shifts_KurlandMcGarvey_ord4(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Real, direct::Bool=false, selforient::Bool=false)
+
+function F_chi1_chi3_fromparam(F_calc_shift::Function)
+    function calc_chi1_chi3_fromparam(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Real, direct::Bool=false, indirect::Bool=false)
+        chi1 = calc_susceptibility_vanVleck(param, T)
+        chi3 = zeros(Float64, 3, 3, 3, 3)
+        if direct
+            chi3 = -4pi*alpha^2*calc_F_deriv4(param, T, [0.0,0.0,0.0]) 
+        end
+        return F_calc_shift(chi1, chi3, R, T, B0, direct, indirect)
+    end
+end
+
+calc_shifts_KurlandMcGarvey_ord4(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Real, direct::Bool=false, indirect::Bool=false) = F_chi1_chi3_fromparam(calc_shifts_KurlandMcGarvey_ord4)(param, R, T, B0, direct, indirect)
+
+function calc_shifts_KurlandMcGarvey_ord4(chi::Array{Float64, 2}, chi3::Array{Float64, 4}, R::Vector{Vector{Float64}}, T::Real, B0::Real, direct::Bool=false, indirect::Bool=false)
     #pcs calculation with Kurland-McGarvey equation 
     #the saturation effect is accounted for with fourth order tensor (determined via analytical equation)
 
     beta = 1/(kB*T)
-
-    chi = calc_susceptibility_vanVleck(param, T)
-    if direct
-        chi3 = -4pi*alpha^2*calc_F_deriv4(param, T, [0.0,0.0,0.0]) 
-    end
   
     shifts = Vector{Float64}(undef, 0)
     for Ri in R
@@ -1605,7 +1614,7 @@ function calc_shifts_KurlandMcGarvey_ord4(param::LFTParam, R::Vector{Vector{Floa
             shift += - (1/5)*trace_ord2(tau)*B0^2
         end
 
-        if selforient
+        if indirect
             shift += (1/45 * beta/mu0 *tr(sigma)*tr(chi) - 1/15 * beta/mu0 * tr(sigma*chi))*B0^2
         end
 
@@ -1615,7 +1624,16 @@ function calc_shifts_KurlandMcGarvey_ord4(param::LFTParam, R::Vector{Vector{Floa
     return shifts
 end
 
-function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Float64, S::Float64, gfactor::Float64, direct::Bool=false, selforient::Bool=false)
+function F_chi1_fromparam(F_calc_shift::Function)
+    function calc_chi1_fromparam(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Float64, S::Float64, gfactor::Float64, direct::Bool=false, indirect::Bool=false)
+        chi1 = calc_susceptibility_vanVleck(param, T)
+        return F_calc_shift(chi1, R, T, B0, S, gfactor, direct, indirect)
+    end
+end
+
+calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Float64, S::Float64, gfactor::Float64, direct::Bool=false, indirect::Bool=false) = F_chi1_fromparam(calc_shifts_KurlandMcGarvey_Br)(param, R, T, B0, S, gfactor, direct, indirect)
+
+function calc_shifts_KurlandMcGarvey_Br(chi::Array{Float64, 2}, R::Vector{Vector{Float64}}, T::Real, B0::Float64, S::Float64, gfactor::Float64, direct::Bool=false, indirect::Bool=false)
     #pcs calculation with Kurland-McGarvey equation
     #the saturation effect is accounted for with Brillouin equation
 
@@ -1623,7 +1641,6 @@ function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float6
 
     #Br = Brillouin(S, T, B0)
     Br = Brillouin_truncated(S, T, B0, gfactor)
-    chi = calc_susceptibility_vanVleck(param, T)
 
     shifts = Vector{Float64}(undef, 0)
     for Ri in R
@@ -1635,7 +1652,7 @@ function calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float6
             shift = -(1/3)*tr(sigma .* Br)
         end
 
-        if selforient
+        if indirect
             shift += (1/45 * beta/mu0 *tr(sigma)*tr(chi) - 1/15 * beta/mu0 * tr(sigma*chi))*B0^2 
         end
 
