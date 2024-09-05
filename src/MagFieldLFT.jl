@@ -704,7 +704,7 @@ function read_HFCmatrix(filecalcnmr::String, natoms::Int)
 end
 
 
-function read_effectiveH(filecalcnmr::String, theory::String, Dflag::Bool=false, gflag::Bool=false)
+function read_effectiveH(filecalcnmr::String, theory::String, Smult::Int, Dflag::Bool=false, gflag::Bool=false)
     #works for orca6
 
     file = readlines(filecalcnmr)
@@ -715,7 +715,7 @@ function read_effectiveH(filecalcnmr::String, theory::String, Dflag::Bool=false,
     for (i, line) in enumerate(file)
 
         if Dflag
-            if occursin("Raw matrix (cm-1)", line) && occursin("ZERO-FIELD SPLITTING", file[i-19]) && occursin("EFFECTIVE HAMILTONIAN", file[i-18])  #depends on S
+            if occursin("Raw matrix (cm-1)", line) && occursin("ZERO-FIELD SPLITTING", file[i-((2*Smult)+11)]) && occursin("EFFECTIVE HAMILTONIAN", file[i-((2*Smult)+10)])  #depends on S
                 matrix = zeros(Float64, 3, 3)
                 for (ij,j) in enumerate(1:1:3)
                     splitline = split(file[i + j], "  ")
@@ -1393,7 +1393,7 @@ end
 """
 This function assumes that the eigenvalues are sorted (i.e., equal eigenvalues have neighboring indices)
 """
-function group_eigenvalues(values::Vector{T}, thresh::Real=1.0e-8) where T<:Real
+function group_eigenvalues(values::Vector{T}, thresh::Real=1.0e-8) where T<:Real  #Do not change thresh, it must be 1e-8
     indices = Vector{Vector{Int64}}(undef, 0)
     unique_values = Vector{T}(undef, 0)
     current_value = values[1]
@@ -1662,7 +1662,8 @@ function calc_shifts_KurlandMcGarvey_Br(chi::Array{Float64, 2}, R::Vector{Vector
     return shifts
 end
 
-function calc_dyadics(s::Float64, D::Matrix{Float64}, T::Real, quadruple::Bool)
+function calc_dyadics(s::Float64, D::Matrix{Float64}, T::Real, quadruple::Bool, reduce::Union{Nothing, Matrix{Complex{Float64}}}=nothing)
+    #reduce corresponds to a reduction matrix
 
     Sp = calc_splusminus(s, +1)
     Sm = calc_splusminus(s, -1)
@@ -1679,7 +1680,7 @@ function calc_dyadics(s::Float64, D::Matrix{Float64}, T::Real, quadruple::Bool)
     solution = eigen(StDS)
     energies = solution.values
     states = solution.vectors
-
+    
     SS = -calc_F_deriv2(energies, states, Hderiv, T)
 
     if quadruple
@@ -1694,14 +1695,14 @@ function calc_dyadics(s::Float64, D::Matrix{Float64}, T::Real, quadruple::Bool)
 end
 
 
-function calc_contactshift_fielddep_Br(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, gfactor::Float64, direct::Bool=false, selforient::Bool=false)
+function calc_contactshift_fielddep_Br(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, gfactor::Float64, direct::Bool=false, selforient::Bool=false, reduce::Union{Nothing, Matrix{Complex{Float64}}}=nothing)
 
     gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
 
     beta = 1/(kB*T)
 
-    SS = calc_dyadics(s, D, T, false)
+    SS = calc_dyadics(s, D, T, false, reduce)
 
     #Br = Brillouin(s, T, B0)
     Br = Brillouin_truncated(s, T, B0, gfactor)
@@ -1740,14 +1741,14 @@ end
 
 
 
-function calc_contactshift_fielddep(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, direct::Bool=false, selforient::Bool=false)
+function calc_contactshift_fielddep(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, direct::Bool=false, selforient::Bool=false, reduce::Union{Nothing, Matrix{Complex{Float64}}}=nothing)
 
     gammaI = 2.6752e8*1e-6 
     gammaI *= 2.35051756758e5
 
     beta = 1/(kB*T)
 
-    SS, SSSS = calc_dyadics(s, D, T, true)
+    SS, SSSS = calc_dyadics(s, D, T, true, reduce)
     
     chi = pi*MagFieldLFT.alpha^2 * g * SS * g'
 
