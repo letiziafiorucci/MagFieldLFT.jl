@@ -1564,7 +1564,7 @@ end
 function trace_ord2(tensor::Array{Float64, 4})
     # computes the order 2 trace of a supersymmetric fourth order tensor
 
-    trace = @tensor begin
+    trace = @tensor begin    # XXXLucasLangXXX: trace should be deleted either in this or the next line
         trace = tensor[i, i, j, j]
     end
 
