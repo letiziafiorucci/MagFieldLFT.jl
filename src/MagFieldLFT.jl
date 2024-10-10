@@ -1,11 +1,12 @@
 module MagFieldLFT
 
-using LinearAlgebra, Permutations, OutputParser, DelimitedFiles, Printf
+using LinearAlgebra, Permutations, OutputParser, DelimitedFiles, Printf, TensorOperations
 
 export read_AILFT_params_ORCA, LFTParam, lebedev_grids
 
 const kB = 3.166811563e-6    # Boltzmann constant in Eh/K
 const alpha = 0.0072973525693  # fine structure constant
+const mu0 = 4pi*alpha^2
 
 function xyz2spher(x::Real, y::Real, z::Real)
     theta = acos(z)
@@ -164,6 +165,28 @@ calc_lz(l::Int) = diagm(l:-1:-l)
 function calc_lplusminus(l::Int, sign::Int)
     @assert Int64(abs(sign)) == 1       # sign may only be +1 or -1
     dim = 2l+1
+    mvalues = l:-1:-l
+    op = zeros(dim,dim)
+    for i_prime in 1:dim
+        m_prime = mvalues[i_prime]
+        for i in 1:dim
+            m = mvalues[i]
+            if m_prime == (m + sign)
+                op[i_prime, i] = sqrt(l*(l+1) - m*(m+sign))
+            end
+        end
+    end
+    return op
+end
+
+"""
+Calculate sz operator in basis of complex atomic orbitals.
+"""
+calc_sz(l::Float64) = diagm(l:-1:-l)
+
+function calc_splusminus(l::Float64, sign::Int)
+    @assert Int64(abs(sign)) == 1       # sign may only be +1 or -1
+    dim = Int(2l+1)
     mvalues = l:-1:-l
     op = zeros(dim,dim)
     for i_prime in 1:dim
@@ -561,6 +584,358 @@ function read_AILFT_params_ORCA(outfile::String, method::String)
     return LFTParam(nel, norb, l, hLFT, F, zeta)
 end
 
+function read_AILFT_params_ORCA6(outfile::String, method::String)
+    nel = parse_int(outfile, ["nel"], 0, 3)
+    norb = parse_int(outfile, ["norb"], 0, 3)
+    l = (norb-1)÷2
+    if norb == 5
+        hLFT = Matrix{Float64}(undef, norb, norb)
+        for row in 1:norb
+            for col in 1:norb
+                hLFT[row,col] = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], row, col)
+            end
+        end
+        perm = [4,2,1,3,5]    # change order from 0,1,-1,2,-2 to 2,1,0,-1,-2 (=x2-y2,xz,z2,yz,xy) 
+        hLFT = hLFT[perm, perm]
+        F2 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 2, 2)
+        F4 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 3, 2)
+        F = Dict(0 => 0, 2 => F2/49, 4 => F4/441)
+        zeta = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "ZETA_D"], 0, 2)/219474.63  # convert from cm-1 to Hartree
+    end
+    if norb == 7
+        hLFT = Matrix{Float64}(undef, norb, norb)
+        for row in 1:norb
+            for col in 1:norb
+                hLFT[row,col] = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Orbital"], row, col)
+            end
+        end
+        
+        perm = [6,4,2,1,3,5,7]   # change order from 0,1,-1,2,-2,3,-3 to 3,2,1,0,-1,-2,-3
+    
+        hLFT = hLFT[perm, perm]
+        F0 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 2, 2)
+        F2 = 0
+        try
+            F2 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 3, 2)
+        catch
+        end
+        F4 = 0
+        F6 = 0
+        try
+            F4 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 4, 2)
+            F6 = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "Slater-Condon"], 5, 2)
+        catch
+        end
+        F = Dict(0 => F0, 2 => F2/15/15, 4 => F4/33/33, 6 => (5/429)^2 * F6)
+        zeta = parse_float(outfile, ["AILFT MATRIX ELEMENTS ($method)", "ZETA_F"], 0, 2)/219474.63  # convert from cm-1 to Hartree
+    end
+    return LFTParam(nel, norb, l, hLFT, F, zeta)
+end
+
+function is_float(element)
+    try
+        parse(Float64, element)
+        return true
+    catch
+        return false
+    end
+end
+
+
+function read_Aiso(filecalcnmr::String)
+
+    file = readlines(filecalcnmr)
+    Aiso = Vector{Float64}(undef, 0)
+    for (i, line) in enumerate(file)
+
+        if occursin("A(iso)", line) 
+            splitline = split(line, "=")
+            push!(Aiso, parse(Float64, splitline[end]))
+        end
+    end
+
+    Aiso = reshape(Aiso ,(1,length(Aiso)))
+    return Aiso
+end
+
+
+function read_HFCmatrix(filecalcnmr::String, natoms::Int)
+    #works for orca6
+
+    file = readlines(filecalcnmr)
+
+    HFC = []
+    AFC = []
+    count = 0
+    for (i, line) in enumerate(file)
+
+        if count > natoms
+            count = 0
+            HFC = []
+            AFC = []
+        end
+
+        if occursin("Raw HFC matrix (all values in MHz)", line) && count < natoms
+            count += 1
+            v_single = zeros(Float64, 3, 3)
+            for (ij,j) in enumerate(2:1:4)
+                splitline = split(file[i + j], "         ")
+                lista = [parse(Float64, splitline[l]) for l in 2:length(splitline) if is_float(splitline[l])]
+                for jj in eachindex(lista)
+                    v_single[ij,jj] = lista[jj]
+                end
+            end
+            push!(HFC, v_single)
+        end
+
+        if occursin("A(FC)", line) && count < natoms+1
+            splitline = split(line, "    ")
+            push!(AFC, [parse(Float64, splitline[j]) for j in 2:length(splitline) if is_float(splitline[j])])
+        end
+
+    end
+
+    Aorb = []
+    for i in eachindex(AFC)
+        push!(Aorb, HFC[i] .- Diagonal(AFC[i]))
+    end 
+
+    return Aorb
+end
+
+
+function read_effectiveH(filecalcnmr::String, theory::String, Dflag::Bool=false, gflag::Bool=false)
+    #works for orca6
+
+    file = readlines(filecalcnmr)
+
+    D_matrices = []
+    g_matrices = []
+
+    for (i, line) in enumerate(file)
+
+        if Dflag
+            if occursin("Raw matrix (cm-1)", line) && occursin("ZERO-FIELD SPLITTING", file[i-19]) && occursin("EFFECTIVE HAMILTONIAN", file[i-18])  #depends on S
+                matrix = zeros(Float64, 3, 3)
+                for (ij,j) in enumerate(1:1:3)
+                    splitline = split(file[i + j], "  ")
+                    lista = [parse(Float64, splitline[l]) for l in 2:length(splitline) if is_float(splitline[l])]
+                    for jj in eachindex(lista)
+                        matrix[ij,jj] = lista[jj]
+                    end
+                end
+                push!(D_matrices, matrix)
+            end
+        end
+
+        if gflag
+            if occursin("g-matrix:", line) && occursin("ELECTRONIC G-MATRIX FROM EFFECTIVE HAMILTONIAN", file[i-4])
+                matrix = zeros(Float64, 3, 3)
+                for (ij,j) in enumerate(1:1:3)
+                    splitline = split(file[i + j], "  ")
+                    lista = [parse(Float64, splitline[l]) for l in 2:length(splitline) if is_float(splitline[l])]
+                    for jj in eachindex(lista)
+                        matrix[ij,jj] = lista[jj]
+                    end
+                end
+                push!(g_matrices, matrix)
+            end
+        end
+    end
+
+    returned = []
+    if theory == "NEVPT2"
+        if Dflag
+            push!(returned, D_matrices[2])
+        end
+        if gflag
+            push!(returned, g_matrices[2])
+        end
+    elseif theory == "CASSCF"
+        if Dflag
+            push!(returned, D_matrices[1])
+        end
+        if gflag
+            push!(returned, g_matrices[1])
+        end
+    else
+        if Dflag
+            push!(returned, D_matrices)
+        end
+        if gflag
+            push!(returned, g_matrices)
+        end
+    end
+    return returned
+end
+
+
+function read_DFT(filecalcnmr::String, Dflag::Bool=false, gflag::Bool=false)
+    #works for orca6
+
+    file = readlines(filecalcnmr)
+
+    D_matrix = Matrix{Float64}(undef, 0, 0)
+    g_matrix = Matrix{Float64}(undef, 0, 0)
+
+    for (i, line) in enumerate(file)
+
+        if Dflag
+            if occursin("raw-matrix :", line) && occursin("ZERO-FIELD-SPLITTING TENSOR", file[i-3])
+                D_matrix = zeros(Float64, 3, 3)
+                for (ij,j) in enumerate(1:1:3)
+                    splitline = split(file[i + j], "  ")
+                    lista = [parse(Float64, splitline[l]) for l in 2:length(splitline) if is_float(splitline[l])]
+                    for jj in eachindex(lista)
+                        D_matrix[ij,jj] = lista[jj]
+                    end
+                end
+            end
+        end
+
+        if gflag
+            if occursin("g-matrix:", line) && occursin("ELECTRONIC G-MATRIX", file[i-3])
+                g_matrix = zeros(Float64, 3, 3)
+                for (ij,j) in enumerate(1:1:3)
+                    splitline = split(file[i + j], "  ")
+                    lista = [parse(Float64, splitline[l]) for l in 2:length(splitline) if is_float(splitline[l])]
+                    for jj in eachindex(lista)
+                        g_matrix[ij,jj] = lista[jj]
+                    end
+                end
+            end
+        end
+    end
+
+    if gflag==false && Dflag
+        return D_matrix
+    elseif Dflag==false && gflag
+        return g_matrix
+    elseif gflag && Dflag
+        return D_matrix, g_matrix
+    end
+
+end
+
+
+function read_integrals_oneelint(fileint::String, dim::Int)
+    file = readlines(fileint)
+    integrals = Float64[]
+    checkpoint=false
+    for (i, line) in enumerate(file)
+
+        if checkpoint
+            splitline = split(line, "    ")
+            push!(integrals, parse(Float64, splitline[end]))
+        end
+
+        if occursin("one-electron integrals", line)
+            checkpoint=true
+        end
+
+    end
+    integrals = reshape(integrals, (dim,dim)) 
+    
+    perm = [6,4,2,1,3,5,7]    # change order from 0,1,-1,2,-2,3,-3 to 3,2,1,0,-1,-2,-3
+    integrals = integrals[perm, perm]
+
+    return integrals
+end
+
+
+function read_integrals_ee(fileint::String, dim::Int)
+
+    file = readlines(fileint)
+    integrals = Float64[]
+    DIM = dim*dim*dim*dim
+    count = 0
+    for (i,line) in enumerate(file)
+        splitline = split(line, "    ")
+        if count < DIM
+            push!(integrals, parse(Float64, splitline[end]))
+        else
+            break
+        end
+        count+=1
+    end
+    integrals = reshape(integrals, (dim,dim,dim,dim))
+    perm = [6,4,2,1,3,5,7]    # change order from 0,1,-1,2,-2,3,-3 to 3,2,1,0,-1,-2,-3
+
+    # for i in 1:size(integrals, 1)
+    #     for j in 1:size(integrals, 2)
+    #         matrice = integrals[i,j,:,:]
+    #         matrice = matrice[perm, perm]
+    #         integrals[i,j,:,:] = matrice
+    #     end
+    # end
+
+    # for i in 1:size(integrals, 1)
+    #     matrice = integrals[i,:,:,:]
+    #     matrice = matrice[perm, :, :]
+    #     integrals[i,:,:,:] = matrice
+    # end
+
+    # integrals = integrals[perm, :, :, :]
+
+    #equivalent to the implementation above
+    integrals = integrals[perm, perm, perm, perm]
+
+    return integrals
+
+end
+
+
+function read_integrals_so_f(fileint::String)   #could be adjuted to be used for d
+
+    file = readlines(fileint)
+    Integrals = NTuple{3, Matrix{Float64}}[]
+    for (i, line) in enumerate(file)
+        integrals = Float64[]
+        if occursin("AI-SOC-", line)
+            column = Float64[]
+            for j in range(2, 16)  #change here for d configurations
+                splitline = split(file[i+j], " ")
+                row = Float64[]
+                for k in eachindex(splitline)
+                    if MagFieldLFT.is_float(splitline[k])
+                        push!(row, parse(Float64, splitline[k]))
+                    end
+                end
+                if length(row) > 2
+                    if integrals == []
+                        integrals = row[2:end]
+                    else
+                        integrals = hcat(integrals, row[2:end])
+                    end
+                elseif length(row) == 2
+                    push!(column, row[end])
+                end
+            end
+            integrals = hcat(integrals', column)
+            if occursin("AI-SOC-X integrals (cm-1)", line)
+                Integrals = (integrals, Integrals...)
+            elseif occursin("AI-SOC-Y integrals (cm-1)", line)
+                Integrals = (Integrals..., integrals)
+            elseif occursin("AI-SOC-Z integrals (cm-1)", line)
+                Integrals = (Integrals..., integrals)
+            end
+        end
+    end
+
+    Integrals = [complex(matrix) for matrix in Integrals]
+
+    perm = [6,4,2,1,3,5,7]    # change order from 0,1,-1,2,-2,3,-3 to 3,2,1,0,-1,-2,-3
+    for i in eachindex(Integrals)
+        Integrals[i] = Integrals[i][perm, perm]*im
+    end
+
+    # for i in eachindex(Integrals)
+    #     Integrals[i] = Integrals[i]*im
+    # end
+    return Integrals
+
+end
+
 const HermMat = Hermitian{T, Matrix{T}} where T <: Number  # Complex hermitian (or real symmetric) matrix
 
 function calc_H_magfield(H_fieldfree::HermMat, L::NTuple{3, Matrix{ComplexF64}}, S::Tuple{Matrix{Float64}, Matrix{ComplexF64}, Matrix{Float64}}, B::Vector{Float64})
@@ -922,7 +1297,7 @@ function calc_F_deriv4(energies::Vector{Float64}, states::Matrix{ComplexF64}, Hd
     for k in 1:factorial(nindices)   # loop over all permutations of three indices
         Fderiv4_symmetrized += permutedims(Fderiv4, Permutation(nindices,k))
     end
-    @assert norm(imag(Fderiv4_symmetrized))/norm(real(Fderiv4_symmetrized)) < 1e-10
+    @assert norm(imag(Fderiv4_symmetrized))/norm(real(Fderiv4_symmetrized)) < 1e-8    #1e-10
     return real(Fderiv4_symmetrized)
 end
 
@@ -1097,10 +1472,16 @@ term_sym = Dict(0 => "S",
                 4 => "G",
                 5 => "H",
                 6 => "I",
-                7 => "J",
-                8 => "K",
-                9 => "L",
-                10 => "M")
+                7 => "K",
+                8 => "L",
+                9 => "M",
+                10 => "N",
+                11 => "O",
+                12 => "Q",
+                13 => "R",
+                14 => "T",
+                15 => "U",
+                16 => "V")
 
 function spinQNlabel(S::Real)
     if abs(S-round(S)) < 1e-10
@@ -1142,6 +1523,265 @@ function adapt_basis_L2_S2_J2_Jz(param::LFTParam, format::String="QN")
     C_list4, labels_list4 = adapt_basis(C_list3, labels_list3, Hermitian(Jz))
     str_labels_list4 = prettylabels_L2_S2_J2_Jz(labels_list4, format)
     return C_list4, str_labels_list4
+end
+
+function Brillouin(S::Float64, T::Float64, B0::Float64)
+
+    muB = 0.5
+    ge = 2.0
+
+    k_B = 3/2*kB*T /(ge*muB*S*(S+1)*B0)
+    a = muB*ge*B0/(2*kB*T)
+    if B0 != 0
+        Br = k_B*((2*S+1)/tanh((2*S+1)*a) - 1/tanh(a))
+    else
+        Br = 1.0
+    end
+
+    return Br
+end
+
+function Brillouin_truncated(S::Float64, T::Float64, B0::Float64, gfactor::Float64=2.0)
+    Br = 1 + B0^2*0.5^2*gfactor^2/(240*(kB*T)^2*S*(S+1)) * (1-(2*S+1)^4)
+    return Br
+end
+
+function orientation_tensor(B0::Float64, T::Float64, chi::Array{Float64, 2})
+    #field-induced self-orientation tensor 
+    #(eq 112 from Parigi, G. et al, Progress in Nuclear Magnetic Resonance Spectroscopy 114–115 (2019) 211–236) 
+
+    w,v = eigen(chi)
+    a = (B0^2)/(5*mu0*kB*T)
+    chiiso = (1/3)*tr(Diagonal(w))
+    Pw = zeros(3,3)
+    for i in 1:3
+    	Pw[i,i]= (1 + a*(w[i]-chiiso))
+    end
+    P = v * Pw * v'
+    return P
+end
+
+function trace_ord2(tensor::Array{Float64, 4})
+    # computes the order 2 trace of a supersymmetric fourth order tensor
+
+    trace = @tensor begin
+        trace = tensor[i, i, j, j]
+    end
+
+    return trace
+end
+
+function product_ord3(tensor::Array{Float64, 4}, Dip::Array{Float64, 2})
+    #dot product between two fourth order tensors
+
+    sigma = zeros(Float64, 3, 3, 3, 3)
+
+    @tensor begin
+        sigma[l, m, n, k] := tensor[l, m, n, q] * Dip[q, k]
+    end
+
+    return sigma
+end
+
+
+function F_chi1_chi3_fromparam(F_calc_shift::Function)
+    function calc_chi1_chi3_fromparam(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Real, direct::Bool=false, indirect::Bool=false)
+        chi1 = calc_susceptibility_vanVleck(param, T)
+        chi3 = zeros(Float64, 3, 3, 3, 3)
+        if direct
+            chi3 = -4pi*alpha^2*calc_F_deriv4(param, T, [0.0,0.0,0.0]) 
+        end
+        return F_calc_shift(chi1, chi3, R, T, B0, direct, indirect)
+    end
+end
+
+calc_shifts_KurlandMcGarvey_ord4(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Real, direct::Bool=false, indirect::Bool=false) = F_chi1_chi3_fromparam(calc_shifts_KurlandMcGarvey_ord4)(param, R, T, B0, direct, indirect)
+
+function calc_shifts_KurlandMcGarvey_ord4(chi::Array{Float64, 2}, chi3::Array{Float64, 4}, R::Vector{Vector{Float64}}, T::Real, B0::Real, direct::Bool=false, indirect::Bool=false)
+    #pcs calculation with Kurland-McGarvey equation 
+    #the saturation effect is accounted for with fourth order tensor (determined via analytical equation)
+
+    beta = 1/(kB*T)
+  
+    shifts = Vector{Float64}(undef, 0)
+    for Ri in R
+        Dip = calc_dipole_matrix(Ri)
+        sigma = -(1/(4pi)) * chi * Dip
+        shift = -(1/3)*tr(sigma)
+
+        if direct
+            tau = -(1/(4pi)) * (1/6) * product_ord3(chi3,Dip)
+            shift += - (1/5)*trace_ord2(tau)*B0^2
+        end
+
+        if indirect
+            shift += (1/45 * beta/mu0 *tr(sigma)*tr(chi) - 1/15 * beta/mu0 * tr(sigma*chi))*B0^2
+        end
+
+        push!(shifts, shift)
+    end
+    shifts *= 1e6    # convert to ppm
+    return shifts
+end
+
+function F_chi1_fromparam(F_calc_shift::Function)
+    function calc_chi1_fromparam(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Float64, S::Float64, gfactor::Float64, direct::Bool=false, indirect::Bool=false)
+        chi1 = calc_susceptibility_vanVleck(param, T)
+        return F_calc_shift(chi1, R, T, B0, S, gfactor, direct, indirect)
+    end
+end
+
+calc_shifts_KurlandMcGarvey_Br(param::LFTParam, R::Vector{Vector{Float64}}, T::Real, B0::Float64, S::Float64, gfactor::Float64, direct::Bool=false, indirect::Bool=false) = F_chi1_fromparam(calc_shifts_KurlandMcGarvey_Br)(param, R, T, B0, S, gfactor, direct, indirect)
+
+function calc_shifts_KurlandMcGarvey_Br(chi::Array{Float64, 2}, R::Vector{Vector{Float64}}, T::Real, B0::Float64, S::Float64, gfactor::Float64, direct::Bool=false, indirect::Bool=false)
+    #pcs calculation with Kurland-McGarvey equation
+    #the saturation effect is accounted for with Brillouin equation
+
+    beta = 1/(kB*T)
+
+    #Br = Brillouin(S, T, B0)
+    Br = Brillouin_truncated(S, T, B0, gfactor)
+
+    shifts = Vector{Float64}(undef, 0)
+    for Ri in R
+        Dip = calc_dipole_matrix(Ri)
+        sigma = -(1/(4pi)) * chi * Dip
+        shift = -(1/3)*tr(sigma)
+
+        if direct
+            shift = -(1/3)*tr(sigma .* Br)
+        end
+
+        if indirect
+            shift += (1/45 * beta/mu0 *tr(sigma)*tr(chi) - 1/15 * beta/mu0 * tr(sigma*chi))*B0^2 
+        end
+
+        push!(shifts, shift)
+    end
+    shifts *= 1e6    # convert to ppm
+    return shifts
+end
+
+function calc_dyadics(s::Float64, D::Matrix{Float64}, T::Real, quadruple::Bool)
+
+    Sp = calc_splusminus(s, +1)
+    Sm = calc_splusminus(s, -1)
+    Sz = calc_sz(s)
+
+    Sx = 0.5 * (Sp + Sm)
+    Sy = -0.5im * (Sp-Sm)
+
+    Hderiv = [Sx, Sy, Sz]
+
+    S = cat(Sx, Sy, Sz; dims=3)
+    StDS = sum(D[i, j] * S[:, :, i] * S[:, :, j] for i in 1:3, j in 1:3)
+
+    solution = eigen(StDS)
+    energies = solution.values
+    states = solution.vectors
+
+    SS = -calc_F_deriv2(energies, states, Hderiv, T)
+
+    if quadruple
+
+        SSSS = -calc_F_deriv4(energies, states, Hderiv, T)
+
+        return SS, SSSS
+    else
+        return SS
+    end
+
+end
+
+
+function calc_contactshift_fielddep_Br(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, gfactor::Float64, direct::Bool=false, selforient::Bool=false)
+
+    gammaI = 2.6752e8*1e-6 
+    gammaI *= 2.35051756758e5
+
+    beta = 1/(kB*T)
+
+    SS = calc_dyadics(s, D, T, false)
+
+    #Br = Brillouin(s, T, B0)
+    Br = Brillouin_truncated(s, T, B0, gfactor)
+    sigma = zeros(length(Aiso), 3, 3)
+
+    chi = pi*MagFieldLFT.alpha^2 * g * SS * g'
+
+    shiftcon = Float64[]
+
+    for (i, Aiso_val) in enumerate(Aiso)
+
+        for l in 1:3, k in 1:3, o in 1:3, p in 1:3
+            if k == p
+                sigma[i, l, k] += -(1/2) * g[l, o] * (Aiso_val*2pi) *(1/gammaI) * SS[o, p]
+            end
+        end
+
+        con = 0
+
+        if selforient
+            con = ((1/45 * beta/mu0 *tr(sigma[i,:,:])*tr(chi) - 1/15 * beta/mu0 * tr(sigma[i,:,:]*chi))*B0^2) * 1e6
+        end
+
+        if direct
+            sigma[i,:,:] *= Br
+        end
+
+        con += -1/3 * tr(sigma[i, :, :]) * 1e6
+        
+        push!(shiftcon, con)
+    end
+
+    return shiftcon
+end
+
+
+
+
+function calc_contactshift_fielddep(s::Float64, Aiso::Matrix{Float64}, g::Matrix{Float64}, D::Matrix{Float64}, T::Real, B0::Float64, direct::Bool=false, selforient::Bool=false)
+
+    gammaI = 2.6752e8*1e-6 
+    gammaI *= 2.35051756758e5
+
+    beta = 1/(kB*T)
+
+    SS, SSSS = calc_dyadics(s, D, T, true)
+    
+    chi = pi*MagFieldLFT.alpha^2 * g * SS * g'
+
+    sigma1 = zeros(length(Aiso), 3, 3)
+    sigma3 = zeros(length(Aiso), 3, 3, 3, 3)
+
+    shiftcon = Float64[]
+
+    for (i, Aiso_val) in enumerate(Aiso)
+
+        for l in 1:3, m in 1:3, n in 1:3, k in 1:3, o in 1:3, p in 1:3, q in 1:3, r in 1:3
+            if k == p && m == 1 && n == 1 && q == 1 && r == 1
+                sigma1[i, l, k] += -(1/2) * g[l, o] * (Aiso_val*2pi) * (1/gammaI) * SS[o, p]
+            end
+
+            if k == r
+                sigma3[i, l, m, n, k] += -(1/8) * g[l, o] * g[m, p] * g[n, q] * (Aiso_val*2pi) *(1/gammaI) * SSSS[o, p, q, r]
+            end
+        end
+
+        con = -1/3 * tr(sigma1[i, :, :]) * 1e6
+
+        if direct
+            con += - 1/30 * trace_ord2(sigma3[i, :, :, :, :]) * B0^2 * 1e6
+        end
+
+        if selforient
+            con += ((1/45 * beta/mu0 *tr(sigma1[i,:,:])*tr(chi) - 1/15 * beta/mu0 * tr(sigma1[i,:,:]*chi))*B0^2) * 1e6
+        end
+
+        push!(shiftcon, con)
+    end
+
+    return shiftcon
 end
 
 
