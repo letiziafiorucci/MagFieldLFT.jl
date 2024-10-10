@@ -745,9 +745,9 @@ function test_KurlandMcGarvey_ord4_Br_field()
     B0 = B0_MHz/42.577478518/2.35051756758e5
     S = 1.0
 
-    shift_ord4 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, B0)
+    shift_ord4 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, B0, true, true)
     KMcG_shifts = MagFieldLFT.calc_shifts_KurlandMcGarvey(param, R, T)
-    Br_shifts = MagFieldLFT.calc_shifts_KurlandMcGarvey_Br(param, R, T, B0, S)
+    Br_shifts = MagFieldLFT.calc_shifts_KurlandMcGarvey_Br(param, R, T, B0, S, 2.0, true, true)
 
     return norm(KMcG_shifts - Br_shifts) < 1.0e-4  && norm(KMcG_shifts - shift_ord4) < 1.0e-4
 end
@@ -777,8 +777,8 @@ function test_KurlandMcGarvey_ord4_Br_temperature()
     B0 = B0_MHz/42.577478518/2.35051756758e5
     S = 1.0
 
-    shift_ord4 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, B0)
-    Br_shifts = MagFieldLFT.calc_shifts_KurlandMcGarvey_Br(param, R, T, B0, S)
+    shift_ord4 = MagFieldLFT.calc_shifts_KurlandMcGarvey_ord4(param, R, T, B0, true, true)
+    Br_shifts = MagFieldLFT.calc_shifts_KurlandMcGarvey_Br(param, R, T, B0, S, 2.0, true, true)
 
     return norm((shift_ord4 - Br_shifts) .* 100 ./ shift_ord4) < 5.0e-2
 end
